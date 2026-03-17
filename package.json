@@ -1,0 +1,10 @@
+{
+  "name": "gods-eye-command-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static cyber operations dashboard with map, aircraft, satellites, and CCTV feeds.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check app.js && node --check server.js"
+  }
+}
