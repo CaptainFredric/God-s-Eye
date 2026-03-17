@@ -15,6 +15,7 @@
 - Added visible flight trails for better motion readability.
 - Corrected satellite orbit calculations for more believable altitude and movement.
 - Improved responsive behavior for medium and smaller screen sizes.
+- Added dedicated split-screen laptop refinements so panels stay readable in tighter desktop widths.
 
 ## Camera Wall Functions
 
@@ -26,6 +27,8 @@
 - Added an `Ops Feed Log` panel to record patrol shifts, camera locks, manual refreshes, and failures.
 - Added a `Mosaic` camera wall mode that shows multiple feeds at once for a more mission-control style layout.
 - Added persistence for selected camera-wall behavior such as mosaic mode, patrol mode readiness, and the chosen camera source.
+- Added a clear sidebar legend to explain aircraft colors, satellite markers, trails, and live camera indicators.
+- Added an about / purpose section so the dashboard explains what it is for at a glance.
 
 ## Interface and Visual Features
 

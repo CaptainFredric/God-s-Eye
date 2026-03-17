@@ -557,6 +557,82 @@ body.sidebar-open #mobile-backdrop {
   letter-spacing: 0.04em;
 }
 
+.legend-grid,
+.purpose-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.legend-swatch {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.08);
+}
+
+.legend-swatch.flight-high {
+  background: #1ee6ff;
+}
+
+.legend-swatch.flight-mid {
+  background: #ffbc42;
+}
+
+.legend-swatch.flight-low {
+  background: #ff5c7b;
+}
+
+.legend-swatch.sat-track {
+  background: linear-gradient(135deg, #8dd4ff, #ff6ca9);
+}
+
+.legend-swatch.trail-line {
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(30, 230, 255, 0.86);
+  border: 0;
+  box-shadow: 0 0 10px rgba(30, 230, 255, 0.28);
+}
+
+.legend-swatch.cam-live {
+  background: #42ff8f;
+}
+
+.legend-copy,
+.purpose-copy p,
+.purpose-list {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1.7;
+}
+
+.purpose-copy p {
+  margin: 0;
+}
+
+.purpose-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.purpose-list li + li {
+  margin-top: 6px;
+}
+
 #map-area {
   position: relative;
   flex: 1;
@@ -1059,6 +1135,40 @@ body.sidebar-open #mobile-backdrop {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
+
+@media (max-width: 1380px) {
+  #topbar {
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  #logo-sub {
+    display: none;
+  }
+
+  #sidebar {
+    width: 268px;
+    min-width: 268px;
+    padding: 14px;
+  }
+
+  #map-panels {
+    right: 14px;
+    top: 62px;
+    grid-template-columns: repeat(2, minmax(0, 220px));
+    max-width: min(52vw, 460px);
+    align-items: start;
+  }
+
+  #mission-panel,
+  #feedlog-panel {
+    grid-column: 1 / -1;
+  }
+
+  .floating-panel {
+    width: auto;
+  }
+}
   background: rgba(255, 255, 255, 0.025);
 }
 
@@ -1178,13 +1288,15 @@ body.sidebar-open #mobile-backdrop {
 
 @media (max-width: 1200px) {
   #sidebar {
-    width: 284px;
-    min-width: 284px;
+    width: 252px;
+    min-width: 252px;
   }
 
   #map-panels {
     right: 16px;
     top: 72px;
+    grid-template-columns: 1fr;
+    max-width: 230px;
   }
 
   .floating-panel {
@@ -1231,6 +1343,7 @@ body.sidebar-open #mobile-backdrop {
     top: auto;
     bottom: 74px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
   }
 
   .floating-panel {
