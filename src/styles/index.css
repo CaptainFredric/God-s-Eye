@@ -1,5 +1,3 @@
-@import "cesium/Build/Cesium/Widgets/widgets.css";
-
 :root {
   --bg: #050d18;
   --bg-soft: rgba(7, 16, 28, 0.7);
@@ -22,6 +20,8 @@
   --fx-noise: 0.04;
   --fx-intensity: 0.58;
   --fx-glow: 0.3;
+  --panel-border: rgba(126, 224, 255, 0.12);
+  --panel-highlight: rgba(126, 224, 255, 0.08);
 }
 
 * {
@@ -39,7 +39,9 @@ body {
   margin: 0;
   color: var(--text);
   font-family: "Rajdhani", system-ui, sans-serif;
-  background: radial-gradient(circle at top, rgba(126, 224, 255, 0.08), transparent 30%), #030913;
+  background:
+    radial-gradient(circle at top, rgba(126, 224, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, #06111d 0%, #030913 62%, #02060d 100%);
   overflow: hidden;
 }
 
@@ -100,6 +102,31 @@ button {
   isolation: isolate;
 }
 
+#app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(126, 224, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126, 224, 255, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px;
+  pointer-events: none;
+  opacity: 0.28;
+  z-index: 2;
+}
+
+#app::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background: conic-gradient(from 0deg, rgba(126, 224, 255, 0.08), transparent 12%, transparent 100%);
+  transform-origin: center;
+  animation: tacticalSweep 28s linear infinite;
+  pointer-events: none;
+  opacity: 0.22;
+  z-index: 2;
+}
+
 #cesiumContainer {
   position: absolute;
   inset: 0;
@@ -143,10 +170,18 @@ canvas {
 .glass-panel {
   position: absolute;
   z-index: 20;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(7, 16, 28, 0.88), rgba(4, 10, 18, 0.74));
+  border: 1px solid var(--panel-border);
+  background:
+    linear-gradient(180deg, rgba(9, 19, 33, 0.9), rgba(4, 10, 18, 0.82)),
+    radial-gradient(circle at top left, rgba(126, 224, 255, 0.08), transparent 38%);
   backdrop-filter: blur(18px) saturate(120%);
   box-shadow: var(--shadow);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.glass-panel:hover {
+  border-color: rgba(126, 224, 255, 0.22);
+  box-shadow: 0 26px 90px rgba(0, 0, 0, 0.46);
 }
 
 #hud-top {
@@ -253,10 +288,10 @@ canvas {
 .fx-btn,
 .event-item {
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
   color: var(--text);
   border-radius: 14px;
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-btn,
@@ -276,6 +311,7 @@ canvas {
   transform: translateY(-1px);
   border-color: var(--line-strong);
   background: rgba(126, 224, 255, 0.08);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
 .panel-btn.primary,
@@ -336,12 +372,29 @@ canvas {
 }
 
 .hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 10px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   font-size: 0.72rem;
   color: var(--muted);
+}
+
+.hud-live {
+  color: var(--cyan);
+  background: rgba(126, 224, 255, 0.08);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--cyan);
+  box-shadow: 0 0 16px rgba(126, 224, 255, 0.6);
+  animation: livePulse 1.8s ease-in-out infinite;
 }
 
 #panel-layers,
@@ -394,8 +447,9 @@ canvas {
   gap: 6px;
   padding: 12px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
   border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .metric-label {
@@ -527,7 +581,7 @@ canvas {
   padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.02));
   color: var(--muted);
 }
 
@@ -552,6 +606,23 @@ canvas {
   color: var(--muted-2);
 }
 
+.entity-stats {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.entity-stats span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.66rem;
+}
+
 .event-item {
   width: 100%;
   display: grid;
@@ -563,6 +634,7 @@ canvas {
 .event-item.active {
   background: rgba(126, 224, 255, 0.08);
   border-color: rgba(126, 224, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(126, 224, 255, 0.06);
 }
 
 .event-minute {
@@ -626,6 +698,63 @@ canvas {
   color: var(--muted);
   font-family: "Share Tech Mono", monospace;
   font-size: 0.68rem;
+}
+
+.hover-tooltip {
+  position: fixed;
+  z-index: 40;
+  max-width: 260px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(126, 224, 255, 0.22);
+  background: rgba(5, 12, 23, 0.92);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+}
+
+.hover-tooltip strong,
+.hover-tooltip span {
+  display: block;
+  font-family: "Share Tech Mono", monospace;
+}
+
+.hover-tooltip strong {
+  color: var(--text);
+}
+
+.hover-tooltip span {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--cyan);
+}
+
+.hover-tooltip p {
+  margin: 6px 0 0;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+@keyframes livePulse {
+  0%,
+  100% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes tacticalSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 #hud-bottom {
@@ -780,6 +909,10 @@ canvas {
   #cesiumContainer {
     position: fixed;
     inset: 0;
+  }
+
+  #app::after {
+    opacity: 0.12;
   }
 
   #hud-top,

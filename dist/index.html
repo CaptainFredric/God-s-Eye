@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="/assets/index-DBYWznmb.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DFOe2nee.css">
+  <script type="module" crossorigin src="/assets/index-C6GL0Pyp.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DjyXkQ2z.css">
 </head>
 <body>
   <div id="app">
@@ -43,6 +43,7 @@
       </div>
 
       <div class="hud-right">
+        <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-text">BASELINE</span></span>
         <span id="hud-fps" class="hud-chip">— FPS</span>
         <span id="hud-camera" class="hud-chip">ALT — · HEADING —</span>
         <button id="btn-home" class="hud-action" type="button">HOME</button>
@@ -151,7 +152,10 @@
         </div>
       </div>
     </footer>
+
+    <div id="hover-tooltip" class="hover-tooltip hidden"></div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
 </body>
 </html>

@@ -1,6 +1,23 @@
-import * as Cesium from "cesium";
-import "./styles/index.css";
 import { BASEMAPS, DEFAULT_BOOKMARKS, FX_MODES, LAYERS, SCENARIO, STORAGE_KEYS } from "./data/scenario.js";
+
+const Cesium = await loadCesium();
+
+function normalizeCesiumModule(module) {
+  if (module?.Viewer) {
+    return module;
+  }
+  if (module?.default?.Viewer) {
+    return module.default;
+  }
+  return module?.default ?? module;
+}
+
+async function loadCesium() {
+  if (globalThis.Cesium?.Viewer) {
+    return globalThis.Cesium;
+  }
+  return normalizeCesiumModule(await import("cesium"));
+}
 
 const replayStart = Cesium.JulianDate.fromDate(new Date(Date.UTC(2026, 2, 17, 0, 0, 0)));
 const replayStop = Cesium.JulianDate.addMinutes(replayStart, SCENARIO.durationMinutes, new Cesium.JulianDate());
@@ -8,7 +25,9 @@ const replayStop = Cesium.JulianDate.addMinutes(replayStart, SCENARIO.durationMi
 const state = {
   selectedEntity: null,
   trackedEntity: null,
-  spinning: false,
+  hoveredEntity: null,
+  spinning: true,
+  spinPausedUntil: 0,
   tiltMode: false,
   searchAbortController: null,
   basemapId: loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
@@ -25,8 +44,11 @@ const dynamic = {
   trails: [],
   zones: [],
   incidents: [],
-  traffic: []
+  traffic: [],
+  rings: []
 };
+
+let frameSamples = [];
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
   animation: false,
@@ -64,7 +86,7 @@ viewer.clock.stopTime = replayStop.clone();
 viewer.clock.currentTime = replayStart.clone();
 viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
 viewer.clock.multiplier = 60 * state.replaySpeed;
-viewer.clock.shouldAnimate = false;
+viewer.clock.shouldAnimate = true;
 viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.6);
 
 const homeView = Cesium.Cartesian3.fromDegrees(
@@ -94,6 +116,7 @@ renderTimelineMarkers();
 installBasemap(state.basemapId);
 seedScene();
 registerEvents();
+elements.btnSpin.classList.toggle("active", state.spinning);
 updateScene(viewer.clock.currentTime);
 startHudClock();
 viewer.scene.requestRender();
@@ -129,10 +152,12 @@ function cacheElements() {
     searchInput: document.getElementById("search-input"),
     searchButton: document.getElementById("search-btn"),
     searchResults: document.getElementById("search-results"),
+    hoverTooltip: document.getElementById("hover-tooltip"),
     hudUtc: document.getElementById("hud-utc"),
     hudLocal: document.getElementById("hud-local"),
     hudFps: document.getElementById("hud-fps"),
     hudCamera: document.getElementById("hud-camera"),
+    hudStatusText: document.getElementById("hud-status-text"),
     btnHome: document.getElementById("btn-home"),
     btnTilt: document.getElementById("btn-tilt"),
     btnSpin: document.getElementById("btn-spin")
@@ -193,18 +218,33 @@ function installBasemap(basemapId) {
 
 function renderMetricCluster() {
   const metrics = [
-    { label: "Flights", value: `${SCENARIO.flights.commercial.length + SCENARIO.flights.military.length}`, foot: "Global traffic" },
-    { label: "Satellites", value: `${SCENARIO.satellites.length}`, foot: "Orbital tracks" },
-    { label: "Ships", value: `${SCENARIO.maritime.length}`, foot: "Maritime routes" },
-    { label: "Events", value: `${SCENARIO.events.length}`, foot: "Replay chapters" }
+    { key: "tracks", label: "Tracks", value: "0", foot: "Visible traffic" },
+    { key: "alerts", label: "Alerts", value: "0", foot: "Active disruptions" },
+    { key: "orbits", label: "Orbit", value: "0", foot: "Overhead passes" },
+    { key: "tempo", label: "Tempo", value: `${state.replaySpeed}×`, foot: "Replay speed" }
   ];
   elements.metricCluster.innerHTML = metrics.map(metric => `
-    <article class="metric-card">
+    <article class="metric-card" data-metric="${metric.key}">
       <span class="metric-label">${metric.label}</span>
       <strong class="metric-value">${metric.value}</strong>
       <span class="metric-foot">${metric.foot}</span>
     </article>
   `).join("");
+}
+
+function updateMetricCard(key, value, foot) {
+  const card = elements.metricCluster.querySelector(`[data-metric="${key}"]`);
+  if (!card) {
+    return;
+  }
+  const valueElement = card.querySelector(".metric-value");
+  const footElement = card.querySelector(".metric-foot");
+  if (valueElement) {
+    valueElement.textContent = String(value);
+  }
+  if (footElement) {
+    footElement.textContent = foot;
+  }
 }
 
 function renderBasemapButtons() {
@@ -287,13 +327,35 @@ function renderTimelineMarkers() {
 }
 
 function seedScene() {
-  createTrafficEntities(SCENARIO.flights.commercial, "commercial", Cesium.Color.fromCssColorString("#7ee0ff"), 55 * 60);
-  createTrafficEntities(SCENARIO.flights.military, "military", Cesium.Color.fromCssColorString("#ffbe5c"), 80 * 60);
+  const commercialTraffic = [...SCENARIO.flights.commercial, ...generateTrafficVariants(SCENARIO.flights.commercial, "COM", 1, 0.9, 0.5)];
+  const militaryTraffic = [...SCENARIO.flights.military, ...generateTrafficVariants(SCENARIO.flights.military, "MIL", 1, 0.45, 0.28)];
+  const maritimeTraffic = [...SCENARIO.maritime, ...generateTrafficVariants(SCENARIO.maritime, "SEA", 1, 0.35, 0.22)];
+  createTrafficEntities(commercialTraffic, "commercial", Cesium.Color.fromCssColorString("#7ee0ff"), 55 * 60);
+  createTrafficEntities(militaryTraffic, "military", Cesium.Color.fromCssColorString("#ffbe5c"), 80 * 60);
   createTrafficEntities(SCENARIO.satellites, "satellites", Cesium.Color.fromCssColorString("#af9dff"), 120 * 60, 8);
-  createTrafficEntities(SCENARIO.maritime, "maritime", Cesium.Color.fromCssColorString("#60f7bf"), 120 * 60, 7);
+  createTrafficEntities(maritimeTraffic, "maritime", Cesium.Color.fromCssColorString("#60f7bf"), 120 * 60, 7);
   createZones();
   createIncidents();
   renderEventRail();
+}
+
+function generateTrafficVariants(items, prefix, variantCount, lngDrift, latDrift) {
+  return items.flatMap((item, itemIndex) => Array.from({ length: variantCount }, (_, variantIndex) => {
+    const driftFactor = itemIndex + variantIndex + 1;
+    return {
+      ...item,
+      id: `${item.id}-${prefix.toLowerCase()}-${variantIndex + 1}`,
+      label: `${prefix}-${String(driftFactor).padStart(2, "0")}`,
+      description: `${item.description} Synthetic support traffic to keep the globe active.`,
+      showLabel: false,
+      positions: item.positions.map((point, pointIndex) => ({
+        ...point,
+        lng: point.lng + Math.sin((pointIndex + 1) * 0.8 + driftFactor) * lngDrift,
+        lat: point.lat + Math.cos((pointIndex + 1) * 0.6 + driftFactor) * latDrift,
+        minute: clamp(point.minute + variantIndex, 0, SCENARIO.durationMinutes)
+      }))
+    };
+  }));
 }
 
 function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) {
@@ -328,7 +390,7 @@ function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) 
         leadTime: 0,
         resolution: 120
       },
-      label: {
+      label: item.showLabel === false ? undefined : {
         text: item.label,
         font: '12px "Share Tech Mono"',
         fillColor: Cesium.Color.WHITE,
@@ -345,9 +407,13 @@ function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) 
         label: item.label,
         description: item.description,
         entityType: layerId,
-        altitude: item.altitude ?? 0
+        altitude: item.altitude ?? 0,
+        synthetic: item.showLabel === false
       }
     });
+    entity._basePixelSize = pixelSize;
+    entity._pulseSeed = Math.random() * Math.PI * 2;
+    entity._layerColor = color;
     dynamic.traffic.push(entity);
   });
 }
@@ -400,6 +466,9 @@ function createZones() {
         }
       });
     }
+    entity._zoneColor = color;
+    entity._baseFill = zone.fill;
+    entity._pulseSeed = Math.random() * Math.PI * 2;
     dynamic.zones.push({ entity, zone });
   });
 }
@@ -433,7 +502,23 @@ function createIncidents() {
         end: incident.end
       }
     });
+    entity._pulseSeed = Math.random() * Math.PI * 2;
     dynamic.incidents.push({ entity, incident });
+
+    const ring = viewer.entities.add({
+      id: `${incident.id}-ring`,
+      position: Cesium.Cartesian3.fromDegrees(incident.location.lng, incident.location.lat, 0),
+      ellipse: {
+        semiMajorAxis: 180000,
+        semiMinorAxis: 180000,
+        material: Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.09),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.4),
+        height: 0
+      }
+    });
+    ring._pulseSeed = Math.random() * Math.PI * 2;
+    dynamic.rings.push({ entity: ring, incident });
   });
 }
 
@@ -446,6 +531,131 @@ function refreshEntityVisibility() {
   dynamic.traffic.forEach(entity => {
     const layerId = entity.properties.layerId.getValue();
     entity.show = !!state.layers[layerId];
+  });
+}
+
+function pausePassiveSpin(duration = 5000) {
+  state.spinPausedUntil = performance.now() + duration;
+}
+
+function focusCameraOnCartesian(cartesian, duration = 1.6) {
+  if (!cartesian) {
+    return;
+  }
+  const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
+  const targetHeight = clamp(viewer.camera.positionCartographic.height * 0.55, 900000, 5500000);
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, targetHeight),
+    orientation: {
+      heading: viewer.camera.heading,
+      pitch: Cesium.Math.toRadians(-52),
+      roll: 0
+    },
+    duration
+  });
+}
+
+function clickedCartesian(position, picked) {
+  if (picked?.id?.position) {
+    return picked.id.position.getValue(viewer.clock.currentTime);
+  }
+  return viewer.scene.pickPositionSupported
+    ? viewer.scene.pickPosition(position)
+    : viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
+}
+
+function getEntityInfo(entity) {
+  if (!entity) {
+    return null;
+  }
+  const props = entity.properties;
+  const label = props?.label?.getValue?.(viewer.clock.currentTime) ?? entity.id;
+  const description = props?.description?.getValue?.(viewer.clock.currentTime) ?? "";
+  const type = props?.entityType?.getValue?.(viewer.clock.currentTime) ?? "unknown";
+  const position = entity.position?.getValue?.(viewer.clock.currentTime);
+  let locationMeta = "Static overlay";
+  if (position) {
+    const cartographic = Cesium.Cartographic.fromCartesian(position);
+    locationMeta = `${Cesium.Math.toDegrees(cartographic.latitude).toFixed(2)}°, ${Cesium.Math.toDegrees(cartographic.longitude).toFixed(2)}°`;
+  }
+  const altitude = props?.altitude?.getValue?.(viewer.clock.currentTime) ?? 0;
+  const synthetic = !!props?.synthetic?.getValue?.(viewer.clock.currentTime);
+  return { label, description, type, locationMeta, altitude, synthetic };
+}
+
+function hideHoverTooltip() {
+  elements.hoverTooltip.classList.add("hidden");
+}
+
+function showHoverTooltip(entity, screenPosition) {
+  const info = getEntityInfo(entity);
+  if (!info) {
+    hideHoverTooltip();
+    return;
+  }
+  elements.hoverTooltip.innerHTML = `
+    <strong>${info.label}</strong>
+    <span>${info.type.toUpperCase()}</span>
+    <p>${info.description || info.locationMeta}</p>
+  `;
+  elements.hoverTooltip.style.left = `${screenPosition.x + 18}px`;
+  elements.hoverTooltip.style.top = `${screenPosition.y + 18}px`;
+  elements.hoverTooltip.classList.remove("hidden");
+}
+
+function updateLiveMetrics(minute) {
+  const visibleTraffic = dynamic.traffic.filter(entity => entity.show).length;
+  const activeAlerts = dynamic.incidents.filter(({ entity }) => entity.show).length + dynamic.zones.filter(({ entity }) => entity.show).length;
+  const visibleOrbits = dynamic.traffic.filter(entity => entity.show && entity.properties.layerId.getValue(viewer.clock.currentTime) === "satellites").length;
+  const currentEvent = latestEvent(minute);
+  updateMetricCard("tracks", visibleTraffic, `${Math.max(1, Math.round(visibleTraffic * 0.35))} sectors hot`);
+  updateMetricCard("alerts", activeAlerts, activeAlerts ? "Disruptions active" : "Monitoring nominal");
+  updateMetricCard("orbits", visibleOrbits, `${currentEvent.tags[0]?.toUpperCase() ?? "GLOBAL"} watch`);
+  updateMetricCard("tempo", `${state.replaySpeed}×`, viewer.clock.shouldAnimate ? "Realtime replay" : "Paused review");
+  if (elements.hudStatusText) {
+    elements.hudStatusText.textContent = currentEvent.title.toUpperCase();
+  }
+}
+
+function updateAmbientEffects() {
+  const phase = performance.now() / 700;
+  dynamic.traffic.forEach(entity => {
+    if (!entity.show || !entity.point) {
+      return;
+    }
+    const layerId = entity.properties.layerId.getValue(viewer.clock.currentTime);
+    const pulseRange = layerId === "military" ? 1.8 : layerId === "commercial" ? 0.9 : layerId === "satellites" ? 0.6 : 0.7;
+    entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase + entity._pulseSeed)) * pulseRange;
+  });
+
+  dynamic.incidents.forEach(({ entity }) => {
+    if (!entity.show || !entity.billboard) {
+      return;
+    }
+    entity.billboard.scale = 0.9 + (Math.sin(phase * 1.6 + entity._pulseSeed) + 1) * 0.08;
+  });
+
+  dynamic.zones.forEach(({ entity }) => {
+    if (!entity.show) {
+      return;
+    }
+    const alpha = entity._baseFill + (Math.sin(phase + entity._pulseSeed) + 1) * 0.02;
+    if (entity.rectangle) {
+      entity.rectangle.material = entity._zoneColor.withAlpha(alpha);
+    }
+    if (entity.polygon) {
+      entity.polygon.material = entity._zoneColor.withAlpha(alpha);
+    }
+  });
+
+  dynamic.rings.forEach(({ entity }) => {
+    if (!entity.show || !entity.ellipse) {
+      return;
+    }
+    const pulse = (Math.sin(phase + entity._pulseSeed) + 1) / 2;
+    entity.ellipse.semiMajorAxis = 160000 + pulse * 90000;
+    entity.ellipse.semiMinorAxis = 160000 + pulse * 90000;
+    entity.ellipse.material = Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.05 + pulse * 0.08);
   });
 }
 
@@ -545,7 +755,7 @@ function registerEvents() {
   });
 
   viewer.clock.onTick.addEventListener(clock => {
-    if (state.spinning && !state.trackedEntity) {
+    if (state.spinning && performance.now() >= state.spinPausedUntil && !state.trackedEntity) {
       viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, Cesium.Math.toRadians(0.06));
     }
     updateScene(clock.currentTime);
@@ -562,11 +772,38 @@ function registerEvents() {
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
   handler.setInputAction(click => {
     const picked = viewer.scene.pick(click.position);
+    pausePassiveSpin(5500);
+    const cartesian = clickedCartesian(click.position, picked);
+    focusCameraOnCartesian(cartesian);
     if (Cesium.defined(picked) && picked.id) {
       state.selectedEntity = picked.id;
       updateSelectedEntityCard(picked.id);
+      showHoverTooltip(picked.id, click.position);
+    } else {
+      state.selectedEntity = null;
+      updateSelectedEntityCard(null);
+      hideHoverTooltip();
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  handler.setInputAction(() => {
+    pausePassiveSpin(6500);
+  }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+
+  handler.setInputAction(() => {
+    pausePassiveSpin(6500);
+  }, Cesium.ScreenSpaceEventType.WHEEL);
+
+  handler.setInputAction(movement => {
+    const picked = viewer.scene.pick(movement.endPosition);
+    if (Cesium.defined(picked) && picked.id) {
+      state.hoveredEntity = picked.id;
+      showHoverTooltip(picked.id, movement.endPosition);
+    } else {
+      state.hoveredEntity = null;
+      hideHoverTooltip();
+    }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
   window.addEventListener("resize", () => viewer.resize());
 }
@@ -583,7 +820,9 @@ function updateScene(currentTime) {
   updateEventRail(minute);
   updateZones(minute);
   updateIncidents(minute);
+  updateLiveMetrics(minute);
   updateFps();
+  updateAmbientEffects();
   updateSelectedEntityCard(state.selectedEntity);
 }
 
@@ -620,6 +859,9 @@ function updateIncidents(minute) {
   dynamic.incidents.forEach(({ entity, incident }) => {
     entity.show = !!state.layers.incidents && minute >= incident.start && minute <= incident.end;
   });
+  dynamic.rings.forEach(({ entity, incident }) => {
+    entity.show = !!state.layers.incidents && minute >= incident.start && minute <= incident.end;
+  });
   dynamic.traffic.forEach(entity => {
     const layerId = entity.properties.layerId.getValue();
     entity.show = !!state.layers[layerId];
@@ -634,22 +876,18 @@ function updateSelectedEntityCard(entity) {
     return;
   }
   elements.entityInfo.classList.remove("empty");
-  const props = entity.properties;
-  const label = props?.label?.getValue?.() ?? entity.id;
-  const description = props?.description?.getValue?.() ?? "";
-  const type = props?.entityType?.getValue?.() ?? "unknown";
-  const position = entity.position?.getValue?.(viewer.clock.currentTime);
-  let locationMeta = "Static overlay";
-  if (position) {
-    const cartographic = Cesium.Cartographic.fromCartesian(position);
-    locationMeta = `${Cesium.Math.toDegrees(cartographic.latitude).toFixed(2)}°, ${Cesium.Math.toDegrees(cartographic.longitude).toFixed(2)}°`;
-  }
+  const { label, description, type, locationMeta, altitude, synthetic } = getEntityInfo(entity);
   elements.entityInfo.innerHTML = `
     <strong>${label}</strong>
     <div>${description}</div>
     <div class="entity-meta">
       <span>${type.toUpperCase()}</span>
       <span>${locationMeta}</span>
+    </div>
+    <div class="entity-stats">
+      <span>ALT ${Math.round(altitude).toLocaleString()} m</span>
+      <span>${synthetic ? "SYNTHETIC SUPPORT" : "PRIMARY TRACK"}</span>
+      <span>${viewer.clock.shouldAnimate ? "LIVE REPLAY" : "REVIEW MODE"}</span>
     </div>
   `;
   updateTrackButtons();
@@ -786,7 +1024,6 @@ function startHudClock() {
   }, 250);
 }
 
-let frameSamples = [];
 function updateFps() {
   const now = performance.now();
   frameSamples.push(now);

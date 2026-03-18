@@ -8,6 +8,7 @@
     name="description"
     content="Panopticon Earth is a Google-Earth-like geospatial intelligence globe with replay controls, simulated traffic, orbital tracks, and cinematic operator tooling."
   />
+  <link rel="stylesheet" href="./styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
@@ -38,6 +39,7 @@
       </div>
 
       <div class="hud-right">
+        <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-text">BASELINE</span></span>
         <span id="hud-fps" class="hud-chip">— FPS</span>
         <span id="hud-camera" class="hud-chip">ALT — · HEADING —</span>
         <button id="btn-home" class="hud-action" type="button">HOME</button>
@@ -146,8 +148,11 @@
         </div>
       </div>
     </footer>
+
+    <div id="hover-tooltip" class="hover-tooltip hidden"></div>
   </div>
 
-  <script type="module" src="/src/main.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
