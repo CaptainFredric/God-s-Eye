@@ -3,296 +3,151 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>God's Eye Command Center</title>
+  <title>Panopticon Earth</title>
   <meta
     name="description"
-    content="A cyber-styled live operations dashboard with satellite tracking, aircraft telemetry, CCTV feeds, and interactive mapping."
+    content="Panopticon Earth is a Google-Earth-like geospatial intelligence globe with replay controls, simulated traffic, orbital tracks, and cinematic operator tooling."
   />
-  <link
-    rel="preconnect"
-    href="https://unpkg.com"
-  />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
 </head>
 <body>
   <div id="app">
-    <div id="mobile-backdrop" aria-hidden="true"></div>
+    <div id="cesiumContainer"></div>
 
-    <header id="topbar">
-      <div id="brand-wrap">
-        <button id="sidebar-toggle" class="btn icon-btn" type="button" aria-label="Toggle sidebar">
-          ☰
-        </button>
-        <div id="logo">
-          <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="var(--accent)" stroke-width="1.4"></circle>
-            <ellipse cx="12" cy="12" rx="4.2" ry="10" fill="none" stroke="var(--accent)" stroke-width="1" opacity="0.55"></ellipse>
-            <line x1="2" y1="12" x2="22" y2="12" stroke="var(--accent)" stroke-width="1" opacity="0.55"></line>
-            <circle cx="12" cy="12" r="2.1" fill="var(--accent)"></circle>
-          </svg>
-          <div>
-            <div id="logo-title">GOD'S EYE COMMAND CENTER</div>
-            <div id="logo-sub">Satellite telemetry · Air traffic · CCTV intelligence · Global map operations</div>
-          </div>
+    <header id="hud-top">
+      <div class="hud-logo">
+        <span class="logo-icon">◈</span>
+        <div>
+          <div class="logo-text">PANOPTICON EARTH</div>
+          <div class="logo-sub">Interactive globe · layered replay traffic · orbital surveillance</div>
         </div>
       </div>
 
-      <nav class="region-btns" id="region-btns" aria-label="Regions"></nav>
+      <div class="hud-search">
+        <input type="text" id="search-input" class="search-input" placeholder="Search any place on Earth..." autocomplete="off" />
+        <button id="search-btn" class="search-btn" type="button" title="Search">⌕</button>
+        <div id="search-results" class="search-results hidden"></div>
+      </div>
 
-      <div id="topbar-right">
-        <div id="status-pill" aria-live="polite">
-          <span id="status-dot"></span>
-          <span id="status-text">LINK INITIALIZING</span>
-        </div>
-        <button id="refresh-feed-btn" class="btn" type="button">REFRESH FEED</button>
-        <button id="focus-flight-btn" class="btn" type="button">TRACK SELECTED</button>
-        <button id="cctv-btn" class="btn danger" type="button">● CCTV LIVE</button>
+      <div class="hud-clock-block">
+        <span id="hud-utc">UTC --:--:--</span>
+        <span class="hud-divider">|</span>
+        <span id="hud-local">LOCAL --:--:--</span>
+      </div>
+
+      <div class="hud-right">
+        <span id="hud-fps" class="hud-chip">— FPS</span>
+        <span id="hud-camera" class="hud-chip">ALT — · HEADING —</span>
+        <button id="btn-home" class="hud-action" type="button">HOME</button>
+        <button id="btn-tilt" class="hud-action" type="button">TILT</button>
+        <button id="btn-spin" class="hud-action" type="button">SPIN</button>
       </div>
     </header>
 
-    <main id="main">
-      <aside id="sidebar">
-        <section class="sidebar-section summary-grid" aria-label="Mission metrics">
-          <article class="metric-card">
-            <span class="metric-label">Contacts</span>
-            <strong class="metric-value" id="metric-aircraft">0</strong>
-            <span class="metric-foot">Live aircraft</span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">Orbitals</span>
-            <strong class="metric-value" id="metric-sats">0</strong>
-            <span class="metric-foot">Tracked satellites</span>
-          </article>
-          <article class="metric-card full-width">
-            <span class="metric-label">Feed mode</span>
-            <strong class="metric-value small" id="metric-mode">NORMAL</strong>
-            <span class="metric-foot" id="metric-uptime">Awaiting telemetry</span>
-          </article>
-        </section>
+    <aside id="panel-layers" class="glass-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Global Layers</h2>
+        <span class="panel-kicker">Click, drag, zoom, and pivot anywhere</span>
+      </div>
 
-        <section class="sidebar-section">
-          <div class="section-title">Map Tiles</div>
-          <div id="tile-btns"></div>
-        </section>
+      <section class="metric-cluster" id="metric-cluster"></section>
 
-        <section class="sidebar-section">
-          <div class="section-title">Visual Mode</div>
-          <div id="mode-btns"></div>
-        </section>
+      <section class="control-group">
+        <h3>Basemap</h3>
+        <div id="basemap-buttons" class="pill-row"></div>
+      </section>
 
-        <section class="sidebar-section">
-          <div class="section-title">Layers</div>
-          <div id="layer-rows"></div>
-        </section>
+      <section class="control-group">
+        <h3>Traffic Layers</h3>
+        <div id="layer-toggles" class="toggle-list"></div>
+      </section>
 
-        <section class="sidebar-section">
-          <div class="section-title">Satellites</div>
-          <div id="sat-list"></div>
-        </section>
-
-        <section class="sidebar-section">
-          <div class="section-title inline-title">
-            <span>Aircraft</span>
-            <span id="ac-count" class="section-count">0</span>
-          </div>
-          <label class="search-wrap" for="ac-search">
-            <span class="sr-only">Search aircraft</span>
-            <input id="ac-search" class="search-input" type="search" placeholder="Search callsign or country" autocomplete="off" />
-          </label>
-          <div id="ac-list"></div>
-        </section>
-
-        <section class="sidebar-section">
-          <div class="section-title">CCTV Feeds</div>
-          <label class="search-wrap" for="cam-search">
-            <span class="sr-only">Search cameras</span>
-            <input id="cam-search" class="search-input" type="search" placeholder="Search camera feed" autocomplete="off" />
-          </label>
-          <div id="cam-list"></div>
-        </section>
-
-        <section class="sidebar-section">
-          <div class="section-title">Legend</div>
-          <div class="legend-grid" aria-label="Map legend">
-            <div class="legend-row">
-              <span class="legend-swatch flight-high"></span>
-              <span class="legend-copy">High-altitude aircraft contact</span>
-            </div>
-            <div class="legend-row">
-              <span class="legend-swatch flight-mid"></span>
-              <span class="legend-copy">Mid-altitude aircraft contact</span>
-            </div>
-            <div class="legend-row">
-              <span class="legend-swatch flight-low"></span>
-              <span class="legend-copy">Low-altitude aircraft contact</span>
-            </div>
-            <div class="legend-row">
-              <span class="legend-swatch sat-track"></span>
-              <span class="legend-copy">Tracked orbital satellite</span>
-            </div>
-            <div class="legend-row">
-              <span class="legend-swatch trail-line"></span>
-              <span class="legend-copy">Projected motion trail</span>
-            </div>
-            <div class="legend-row">
-              <span class="legend-swatch cam-live"></span>
-              <span class="legend-copy">Camera pin or live sensor source</span>
-            </div>
-          </div>
-        </section>
-
-        <section class="sidebar-section">
-          <div class="section-title">About / Purpose</div>
-          <div class="purpose-copy">
-            <p>
-              God's Eye is designed as a global situational-awareness dashboard for quickly reading movement,
-              feed integrity, orbit activity, and camera coverage in one place.
-            </p>
-            <ul class="purpose-list">
-              <li>Keep telemetry visible even when live sources fail.</li>
-              <li>Show motion clearly through trails, orbit paths, and refresh loops.</li>
-              <li>Give a fast command-center view that works on real laptop split-screen layouts.</li>
-            </ul>
-          </div>
-        </section>
-      </aside>
-
-      <section id="map-area" aria-label="Tactical map area">
-        <div id="map"></div>
-        <div id="map-overlay-grid" aria-hidden="true"></div>
-        <div id="map-overlay-sweep" aria-hidden="true"></div>
-
-        <div class="hud" id="hud-tl">ESRI SATELLITE · EUROPE · 0 CONTACTS</div>
-        <div class="hud" id="hud-mode">● NORMAL</div>
-        <div class="hud" id="hud-bl">
-          <span id="hud-status-dot">●</span>
-          <span id="hud-bl-text">0 AIRCRAFT · 0 SATS · --:--:-- UTC</span>
-        </div>
-
-        <div id="map-panels">
-          <section class="floating-panel" id="mission-panel">
-            <div class="panel-heading">Mission Status</div>
-            <div class="panel-body">
-              <div class="mission-row">
-                <span>Source</span>
-                <strong id="mission-source">OpenSky standby</strong>
-              </div>
-              <div class="mission-row">
-                <span>Integrity</span>
-                <strong id="mission-auth">Simulation warm-up</strong>
-              </div>
-              <div class="mission-row">
-                <span>Region</span>
-                <strong id="mission-region">EUROPE</strong>
-              </div>
-              <div class="mission-row">
-                <span>Camera grid</span>
-                <strong>10 active feeds</strong>
-              </div>
-              <div class="mission-row">
-                <span>Motion model</span>
-                <strong id="mission-motion">Pending telemetry</strong>
-              </div>
-              <div class="mission-row">
-                <span>Flight focus</span>
-                <strong id="mission-flight">No selection</strong>
-              </div>
-            </div>
-          </section>
-
-          <section id="globe-panel" class="floating-panel">
-            <div id="globe-label">3D Globe</div>
-            <canvas id="globe-canvas"></canvas>
-          </section>
-
-          <section id="signals-panel" class="floating-panel">
-            <div class="panel-heading">Sensor Matrix</div>
-            <div class="signal-grid">
-              <article class="signal-card">
-                <span class="signal-label">Feed Class</span>
-                <strong id="signal-feed-class">Live snapshot</strong>
-              </article>
-              <article class="signal-card">
-                <span class="signal-label">Selected Sensor</span>
-                <strong id="signal-selected-camera">Times Square NYC</strong>
-              </article>
-              <article class="signal-card">
-                <span class="signal-label">Cadence</span>
-                <strong id="signal-camera-cadence">15s refresh</strong>
-              </article>
-              <article class="signal-card">
-                <span class="signal-label">Scan Mode</span>
-                <strong id="signal-camera-mode">Manual lock</strong>
-              </article>
-              <article class="signal-card wide">
-                <span class="signal-label">Frame Age</span>
-                <strong id="signal-frame-age">Awaiting lock</strong>
-              </article>
-            </div>
-          </section>
-
-          <section id="feedlog-panel" class="floating-panel">
-            <div class="panel-heading">Ops Feed Log</div>
-            <div id="feed-log"></div>
-          </section>
+      <section class="control-group">
+        <h3>Camera Bookmarks</h3>
+        <div id="bookmark-list" class="bookmark-list"></div>
+        <div class="bookmark-actions">
+          <button id="save-bookmark" class="panel-btn primary" type="button">Save View</button>
+          <button id="clear-bookmarks" class="panel-btn" type="button">Clear</button>
         </div>
       </section>
-    </main>
+    </aside>
 
-    <footer id="statusbar">
-      <span id="sb-dot">●</span>
-      <span>Telemetry: <span id="sb-status">INITIALIZING</span></span>
-      <span class="sep">|</span>
-      <span><span id="sb-ac">0</span> aircraft</span>
-      <span class="sep">|</span>
-      <span><span id="sb-sats">0</span> satellites</span>
-      <span class="sep">|</span>
-      <span><span id="sb-cams">10</span> camera feeds</span>
-      <span class="attr" id="sb-attr">Esri World Imagery · OpenSky Network · Simulated fallback enabled</span>
+    <aside id="panel-right" class="glass-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Scene Control</h2>
+        <span class="panel-kicker">Cinematic tuning and tracking</span>
+      </div>
+
+      <section class="control-group">
+        <h3>Visual Mode</h3>
+        <div id="fx-mode-buttons" class="pill-row"></div>
+      </section>
+
+      <section class="control-group sliders">
+        <h3>Live Tuning</h3>
+        <label class="slider-row">
+          <span>FX Intensity</span>
+          <input id="fx-intensity" type="range" min="0" max="100" value="58" />
+          <strong id="fx-intensity-value">58</strong>
+        </label>
+        <label class="slider-row">
+          <span>Glow</span>
+          <input id="fx-glow" type="range" min="0" max="100" value="30" />
+          <strong id="fx-glow-value">30</strong>
+        </label>
+        <label class="slider-row">
+          <span>Replay Speed</span>
+          <input id="replay-speed" type="range" min="1" max="30" value="8" />
+          <strong id="replay-speed-value">8×</strong>
+        </label>
+      </section>
+
+      <section class="control-group">
+        <h3>Selected Object</h3>
+        <div id="entity-info" class="entity-card empty">Select a flight, satellite, ship, event, or zone on the globe.</div>
+        <div class="entity-actions">
+          <button id="track-selected" class="panel-btn primary" type="button" disabled>Track</button>
+          <button id="release-track" class="panel-btn" type="button" disabled>Release</button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <h3>Replay Highlights</h3>
+        <div id="event-rail" class="event-rail"></div>
+      </section>
+    </aside>
+
+    <section id="floating-summary" class="glass-panel">
+      <div class="summary-head">
+        <span id="summary-stage">Monitoring baseline</span>
+        <span id="summary-time">T+00:00Z</span>
+      </div>
+      <p id="summary-copy">Panopticon Earth merges aircraft, maritime traffic, satellites, and event overlays into a globe-first exploratory interface.</p>
+      <div id="summary-tags" class="summary-tags"></div>
+    </section>
+
+    <footer id="hud-bottom">
+      <div id="transport-controls">
+        <button id="play-toggle" class="transport-btn primary" type="button">Play</button>
+        <button id="pause-toggle" class="transport-btn" type="button">Pause</button>
+        <button id="reset-toggle" class="transport-btn" type="button">Reset</button>
+      </div>
+
+      <div id="timeline-shell">
+        <div id="timeline-meta">
+          <span class="timeline-title">World Replay</span>
+          <span id="timeline-caption">Simulated traffic, jamming, closures, and orbital passes unfold across the globe in time.</span>
+        </div>
+        <div id="timeline-track">
+          <div id="timeline-markers"></div>
+          <input id="timeline-slider" type="range" min="0" max="100" value="0" step="1" />
+        </div>
+      </div>
     </footer>
   </div>
 
-  <div id="cctv-overlay" aria-hidden="true">
-    <div id="cctv-header">
-      <span id="cctv-title">● LIVE CCTV</span>
-      <span id="cctv-coords"></span>
-      <span id="cctv-provider"></span>
-      <span id="cctv-feed-class" class="cctv-chip">LIVE SNAPSHOT</span>
-      <span id="cctv-refresh-meta" class="cctv-chip">15S REFRESH</span>
-      <span id="cctv-hint">Select a thumbnail to switch feeds</span>
-      <button id="cctv-refresh-now" class="btn" type="button">REFRESH FRAME</button>
-      <button id="cctv-next-feed" class="btn" type="button">NEXT FEED</button>
-      <button id="cctv-auto-cycle" class="btn" type="button">AUTO CYCLE OFF</button>
-      <button id="cctv-mosaic-toggle" class="btn" type="button">MOSAIC OFF</button>
-      <a id="cctv-open-source" class="btn" href="#" target="_blank" rel="noopener">OPEN SOURCE</a>
-      <button id="cctv-close" type="button">✕ CLOSE</button>
-    </div>
-    <div id="cctv-viewer">
-      <iframe id="cctv-iframe" title="Live CCTV stream" allow="autoplay; fullscreen" allowfullscreen></iframe>
-      <img id="cctv-img" alt="CCTV stream" />
-      <div id="cctv-mosaic" aria-label="Multi-camera mosaic"></div>
-      <div id="cctv-fallback" aria-live="polite">
-        <img id="cctv-fallback-image" alt="Feed fallback preview" />
-        <div id="cctv-fallback-card">
-          <strong id="cctv-fallback-title">Feed preview ready</strong>
-          <p id="cctv-fallback-text">If the embedded stream is blocked here, open the source feed directly.</p>
-        </div>
-      </div>
-      <div id="cctv-live-badge">
-        <span id="cctv-live-dot"></span>
-        <span id="cctv-live-time">LIVE</span>
-      </div>
-    </div>
-    <div id="cctv-thumbs"></div>
-  </div>
-
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.js"
-  ></script>
-  <script src="./app.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

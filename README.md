@@ -1,23 +1,27 @@
-# God's Eye Command Center
+# Worldline 4D
 
-Cyber-styled static operations dashboard with:
+Modern crisis-replay foundation for viewing flights, satellites, jamming, maritime traffic, closures, and cascading events across time.
 
-- live or simulated air-traffic telemetry
-- orbital satellite tracking
-- interactive Leaflet map layers
-- CCTV feed launcher with fullscreen viewer
-- verified public camera wall using live snapshots with auto-refresh and source links
-- responsive sidebar and mobile drawer support
+## What This Build Is
+
+This version is the foundation of a `3D / 4D worldview-style` application:
+
+- `4D playback timeline` for scrubbing through a full situation sequence
+- `sensor-layer fusion` across commercial flights, military flights, satellites, maritime traffic, closures, and jamming
+- `area-of-interest correlation` for seeing what assets are overhead when events occur
+- `modern ops UI` designed for large displays and split-screen laptop monitoring
+
+The current build uses a modeled replay dataset to prove out the product direction and interaction patterns.
 
 ## Files
 
-- `index.html` — app shell
-- `styles.css` — layout and visual system
-- `app.js` — map, telemetry, satellites, UI, CCTV logic
-- `server.js` — tiny local static server
-- `ADAN_NOTES.md` — handoff notes describing deviations from the original concept
+- `index.html` — application shell
+- `styles.css` — modern multi-pane interface and responsive layout
+- `app.js` — replay engine, timeline logic, layers, and UI rendering
+- `server.js` — lightweight static server
+- `ADAN_NOTES.md` — project handoff summary
 
-## Run locally
+## Run Locally
 
 If you have Node.js installed:
 
@@ -25,8 +29,6 @@ If you have Node.js installed:
 npm run check
 npm start
 ```
-
-Then open `http://localhost:4173`.
 
 If you want a dependency-free preview on macOS with Ruby:
 
@@ -36,11 +38,11 @@ ruby -run -e httpd . -p 4173
 
 Then open `http://localhost:4173`.
 
-## Notes
+## Product Direction
 
-- The app starts with simulated aircraft immediately so the dashboard never loads empty.
-- It then attempts live OpenSky aircraft data through several routes and falls back gracefully if those requests fail or time out.
-- If the live feed is unavailable, the demo telemetry remains active so the UI, trails, focus controls, and counters still work.
-- Satellite motion uses a lightweight client-side orbit model driven by TLE-derived parameters for ambient visualization.
-- Camera feeds now favor verified public live snapshots instead of brittle YouTube embeds, and the viewer can refresh frames or auto-cycle sources.
-- The dashboard now saves key preferences like map mode, region, enabled layers, and camera-wall settings between reloads.
+The next logical evolution would be:
+
+- replacing the 2D theater map with a dedicated 3D globe engine
+- swapping the modeled replay dataset for real feeds and ingestion pipelines
+- adding scenario libraries, saved viewpoints, and narrative chapters
+- introducing more advanced AOI analytics and asset correlation tooling
