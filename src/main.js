@@ -42,8 +42,11 @@ const state = {
   newsOpen:              false,
   newsCategory:          "war",
   newsArticles:          [],
+  newsTickerPool:        [],
+  newsTickerIndex:       0,
   newsLastFetched:       null,
   newsRefreshTimer:      null,
+  newsTickerTimer:       null,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -294,6 +297,7 @@ function cacheElements() {
     btnHome:             document.getElementById("btn-home"),
     btnTilt:             document.getElementById("btn-tilt"),
     btnSpin:             document.getElementById("btn-spin"),
+    liveNewsHeadline:    document.getElementById("live-news-headline"),
     newsBriefing:        document.getElementById("news-briefing"),
     newsCards:           document.getElementById("news-cards"),
     newsCatNav:          document.getElementById("news-cat-nav"),
@@ -1873,6 +1877,7 @@ function registerEvents() {
     if (event.key.toLowerCase() === "r") { refreshLiveFeeds(); return; }
     if (event.key.toLowerCase() === "l") { setMobileDrawer(window.innerWidth <= 980 ? "layers"   : null); return; }
     if (event.key.toLowerCase() === "c") { setMobileDrawer(window.innerWidth <= 980 ? "controls" : null); return; }
+    if (event.key.toLowerCase() === "n") { toggleNewsPanel(); return; }
     if (event.key.toLowerCase() === "i") { if (state.selectedEntity) openIntelSheet(state.selectedEntity); return; }
     if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); closeNewsPanel(); }
   });
@@ -1912,6 +1917,8 @@ function initNewsPanel() {
     invalidateNewsCache();
     loadNewsCategory(state.newsCategory, false);
   }, 90_000);
+
+  startNewsTicker();
 
   // Kick off initial fetch silently (panel starts closed)
   prefetchAllCategories();
@@ -1982,6 +1989,9 @@ async function loadNewsCategory(catId, forceRefresh) {
     renderNewsCards(state.newsArticles);
     updateCategoryCount(catId, state.newsArticles.length);
     updateBadge(state.newsArticles.length);
+    if (state.newsCategory === catId) {
+      setNewsTickerPool(state.newsArticles);
+    }
   } catch (err) {
     renderNewsError(`Fetch failed: ${err?.message ?? "Network error"}`);
   } finally {
@@ -1992,9 +2002,14 @@ async function loadNewsCategory(catId, forceRefresh) {
 async function prefetchAllCategories() {
   try {
     const all = await fetchAllNewsCategories();
+    const combinedPool = [];
     Object.entries(all).forEach(([catId, result]) => {
-      updateCategoryCount(catId, (result.articles ?? []).length);
+      const catArticles = result.articles ?? [];
+      updateCategoryCount(catId, catArticles.length);
+      combinedPool.push(...catArticles.slice(0, 4));
     });
+    setNewsTickerPool(combinedPool);
+
     // Seed default category
     const defaultResult = all[state.newsCategory];
     if (defaultResult?.articles?.length) {
@@ -2051,33 +2066,121 @@ function buildNewsCard(article, cat, index) {
   a.style.animationDelay = `${index * 0.045}s`;
   a.setAttribute("role", "listitem");
 
-  const thumbHtml = article.image
-    ? `<img class="news-card-thumb" src="${escAttr(article.image)}" alt="" loading="lazy"
-         onerror="this.style.display='none';this.parentElement.querySelector('.news-card-thumb-fallback').style.display='flex'">`
-    : "";
-  const fallbackHtml = `<span class="news-card-thumb-fallback" style="${article.image ? "display:none" : ""}">
-    ${escHtml(cat.icon)}</span>`;
+  const thumbWrap = document.createElement("div");
+  thumbWrap.className = "news-card-thumb-wrap";
 
-  a.innerHTML = `
-    <div class="news-card-thumb-wrap">
-      ${thumbHtml}${fallbackHtml}
-    </div>
-    <div class="news-card-body">
-      <div class="news-card-meta">
-        <span class="news-card-cat" style="background:${escAttr(cat.color)}">${escHtml(cat.label)}</span>
-        <span class="news-card-outlet">
-          <img class="news-outlet-favicon" src="${escAttr(article.favicon)}" alt="" loading="lazy"
-            onerror="this.style.display='none'">
-          <span class="news-outlet-domain">${escHtml(article.domain)}</span>
-        </span>
-      </div>
-      <div class="news-card-title">${escHtml(article.title)}</div>
-      <div class="news-card-time">${escHtml(article.relativeTime)}${article.country ? ` · ${escHtml(article.country)}` : ""}</div>
-    </div>`;
+  const fallback = document.createElement("span");
+  fallback.className = "news-card-thumb-fallback";
+  fallback.textContent = cat.icon;
+
+  if (article.image) {
+    const img = document.createElement("img");
+    img.className = "news-card-thumb";
+    img.src = article.image;
+    img.alt = "";
+    img.loading = "lazy";
+    fallback.style.display = "none";
+    img.addEventListener("error", () => {
+      img.remove();
+      fallback.style.display = "flex";
+    });
+    thumbWrap.appendChild(img);
+  }
+  thumbWrap.appendChild(fallback);
+
+  const body = document.createElement("div");
+  body.className = "news-card-body";
+
+  const meta = document.createElement("div");
+  meta.className = "news-card-meta";
+
+  const catChip = document.createElement("span");
+  catChip.className = "news-card-cat";
+  catChip.style.background = cat.color;
+  catChip.textContent = cat.label;
+
+  const outlet = document.createElement("span");
+  outlet.className = "news-card-outlet";
+
+  const favicon = document.createElement("img");
+  favicon.className = "news-outlet-favicon";
+  favicon.src = article.favicon;
+  favicon.alt = "";
+  favicon.loading = "lazy";
+  favicon.addEventListener("error", () => favicon.remove());
+
+  const domain = document.createElement("span");
+  domain.className = "news-outlet-domain";
+  domain.textContent = article.domain;
+
+  outlet.appendChild(favicon);
+  outlet.appendChild(domain);
+  meta.appendChild(catChip);
+  meta.appendChild(outlet);
+
+  const title = document.createElement("div");
+  title.className = "news-card-title";
+  title.textContent = article.title;
+
+  const time = document.createElement("div");
+  time.className = "news-card-time";
+  time.textContent = `${article.relativeTime}${article.country ? ` · ${article.country}` : ""}`;
+
+  body.appendChild(meta);
+  body.appendChild(title);
+  body.appendChild(time);
+
+  a.appendChild(thumbWrap);
+  a.appendChild(body);
   return a;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
+
+function setNewsTickerPool(items) {
+  if (!Array.isArray(items) || !items.length) return;
+  const deduped = [];
+  const seen = new Set();
+  items.forEach(item => {
+    const key = item?.url || item?.title;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    deduped.push(item);
+  });
+  state.newsTickerPool = deduped.slice(0, 24);
+  state.newsTickerIndex = 0;
+  renderNewsTickerHeadline();
+}
+
+function startNewsTicker() {
+  if (!elements.liveNewsHeadline) return;
+  renderNewsTickerHeadline();
+  if (state.newsTickerTimer) window.clearInterval(state.newsTickerTimer);
+  state.newsTickerTimer = window.setInterval(() => {
+    if (!state.newsTickerPool.length) return;
+    state.newsTickerIndex = (state.newsTickerIndex + 1) % state.newsTickerPool.length;
+    renderNewsTickerHeadline(true);
+  }, 12000);
+}
+
+function renderNewsTickerHeadline(animate = false) {
+  const el = elements.liveNewsHeadline;
+  if (!el) return;
+  if (!state.newsTickerPool.length) {
+    el.href = "https://www.gdeltproject.org";
+    el.textContent = "🛰 Live headlines initializing…";
+    return;
+  }
+
+  const item = state.newsTickerPool[state.newsTickerIndex] ?? state.newsTickerPool[0];
+  el.href = item.url;
+  el.textContent = `🛰 ${item.title}`;
+  if (animate) {
+    el.classList.remove("updating");
+    void el.offsetWidth;
+    el.classList.add("updating");
+  }
+}
 
 function setNewsUpdatedLabel(date) {
   if (!elements.newsUpdated || !date) return;
@@ -2113,8 +2216,4 @@ function escHtml(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function escAttr(str) {
-  return String(str ?? "").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }

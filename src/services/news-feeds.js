@@ -10,6 +10,27 @@ const CACHE_DURATION_MS = 90_000; // match default refresh cadence
 
 const _cache = new Map();
 
+function isHttpUrl(value) {
+  if (!value || typeof value !== "string") return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function dedupeArticles(articles) {
+  const seen = new Set();
+  const deduped = [];
+  articles.forEach(article => {
+    const key = `${article.url}|${article.title.toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    deduped.push(article);
+  });
+  return deduped.sort((left, right) => {
+    const leftTs = left.seenAt?.getTime?.() ?? 0;
+    const rightTs = right.seenAt?.getTime?.() ?? 0;
+    return rightTs - leftTs;
+  });
+}
+
 function gdeltUrl(query, maxRecords = 12) {
   const params = new URLSearchParams({
     query,
@@ -52,13 +73,16 @@ function domainFavicon(domain) {
 }
 
 function normalise(raw) {
+  if (!isHttpUrl(raw?.url)) return null;
   const date = parseSeenDate(raw.seendate);
   const domain = raw.domain || "unknown";
-  const image = raw.socialimage && raw.socialimage.startsWith("http") ? raw.socialimage : null;
+  const image = isHttpUrl(raw?.socialimage) ? raw.socialimage : null;
+  const title = (raw.title || "Untitled").replace(/\s+/g, " ").trim();
+  if (!title || title.length < 8) return null;
   return {
     id: raw.url,
     url: raw.url,
-    title: (raw.title || "Untitled").replace(/\s+/g, " ").trim(),
+    title,
     image,
     domain,
     favicon: domainFavicon(domain),
@@ -86,7 +110,7 @@ async function fetchGdelt(query, cacheKey, maxRecords = 12) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     const raw = Array.isArray(payload?.articles) ? payload.articles : [];
-    const articles = raw.map(normalise).filter(a => !!a.url);
+    const articles = dedupeArticles(raw.map(normalise).filter(Boolean));
     _cache.set(cacheKey, { data: articles, ts: now });
     return { articles, fromCache: false, fetchedAt: new Date(now) };
   } catch (error) {
@@ -139,8 +163,6 @@ export const NEWS_CATEGORIES = [
     maxRecords: 12
   }
 ];
-
-const categoryPromises = new Map();
 
 export async function fetchNewsCategory(categoryId) {
   const cat = NEWS_CATEGORIES.find(c => c.id === categoryId);
