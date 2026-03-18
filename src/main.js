@@ -47,6 +47,9 @@ const state = {
   newsLastFetched:       null,
   newsRefreshTimer:      null,
   newsTickerTimer:       null,
+  newsTickerPaused:      false,
+  newsCategoryTimer:     null,
+  newsPanelHovering:     false,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -1912,6 +1915,14 @@ function initNewsPanel() {
     loadNewsCategory(state.newsCategory, true);
   });
 
+  elements.liveNewsHeadline?.addEventListener("mouseenter", () => { state.newsTickerPaused = true; });
+  elements.liveNewsHeadline?.addEventListener("mouseleave", () => { state.newsTickerPaused = false; });
+  elements.liveNewsHeadline?.addEventListener("focus", () => { state.newsTickerPaused = true; });
+  elements.liveNewsHeadline?.addEventListener("blur", () => { state.newsTickerPaused = false; });
+
+  elements.newsBriefing?.addEventListener("mouseenter", () => { state.newsPanelHovering = true; });
+  elements.newsBriefing?.addEventListener("mouseleave", () => { state.newsPanelHovering = false; });
+
   // Auto-refresh every 90 seconds (matches main refresh cadence)
   state.newsRefreshTimer = window.setInterval(() => {
     invalidateNewsCache();
@@ -1936,6 +1947,7 @@ function openNewsPanel() {
   state.newsOpen = true;
   elements.newsBriefing?.classList.remove("hidden");
   elements.newsToggleBtn?.classList.add("active");
+  startNewsCategoryRotation();
   hideBadge();
   if (!state.newsArticles.length) {
     loadNewsCategory(state.newsCategory, true);
@@ -1949,6 +1961,7 @@ function closeNewsPanel() {
   state.newsOpen = false;
   elements.newsBriefing?.classList.add("hidden");
   elements.newsToggleBtn?.classList.remove("active");
+  stopNewsCategoryRotation();
 }
 
 async function switchNewsCategory(catId) {
@@ -2157,10 +2170,33 @@ function startNewsTicker() {
   renderNewsTickerHeadline();
   if (state.newsTickerTimer) window.clearInterval(state.newsTickerTimer);
   state.newsTickerTimer = window.setInterval(() => {
+    if (state.newsTickerPaused) return;
     if (!state.newsTickerPool.length) return;
     state.newsTickerIndex = (state.newsTickerIndex + 1) % state.newsTickerPool.length;
     renderNewsTickerHeadline(true);
   }, 12000);
+}
+
+function startNewsCategoryRotation() {
+  if (state.newsCategoryTimer) window.clearInterval(state.newsCategoryTimer);
+  state.newsCategoryTimer = window.setInterval(() => {
+    if (!state.newsOpen || state.newsPanelHovering) return;
+    rotateToNextNewsCategory();
+  }, 22000);
+}
+
+function stopNewsCategoryRotation() {
+  if (!state.newsCategoryTimer) return;
+  window.clearInterval(state.newsCategoryTimer);
+  state.newsCategoryTimer = null;
+}
+
+function rotateToNextNewsCategory() {
+  const index = NEWS_CATEGORIES.findIndex(category => category.id === state.newsCategory);
+  const nextIndex = index >= 0 ? (index + 1) % NEWS_CATEGORIES.length : 0;
+  const nextCategory = NEWS_CATEGORIES[nextIndex];
+  if (!nextCategory) return;
+  switchNewsCategory(nextCategory.id);
 }
 
 function renderNewsTickerHeadline(animate = false) {
