@@ -342,16 +342,66 @@ canvas {
   box-shadow: var(--shadow);
 }
 
+.search-meta {
+  margin-top: 8px;
+  color: var(--muted-2);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  font-family: "Share Tech Mono", monospace;
+}
+
+.search-group-label {
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--muted-2);
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-family: "Share Tech Mono", monospace;
+}
+
 .search-result {
   width: 100%;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   padding: 12px 14px;
   text-align: left;
   border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   background: transparent;
   color: var(--text);
+}
+
+.search-result-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-result-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 66px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 224, 255, 0.24);
+  background: rgba(126, 224, 255, 0.1);
+  color: var(--cyan);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.search-result-sub {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.search-result-meta {
+  color: var(--muted-2);
+  font-size: 0.65rem;
 }
 
 .search-result:last-child {
@@ -1175,11 +1225,6 @@ body.compact-ui .control-group + .control-group {
     flex-wrap: wrap;
   }
 
-  #timeline-meta {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
   .search-results {
     right: 0;
   }
@@ -1211,7 +1256,6 @@ body.compact-ui .control-group + .control-group {
   }
 
   .logo-sub,
-  #timeline-caption,
   .layer-description,
   .event-summary,
   #summary-copy {

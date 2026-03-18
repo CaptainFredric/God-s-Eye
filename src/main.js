@@ -30,7 +30,9 @@ const state = {
   declutter:             loadJson(UI_STORAGE_KEYS.declutter, false),
   compact:               loadJson(UI_STORAGE_KEYS.compact, false),
   tiltMode:              false,
+  regionFocus:           null,
   searchAbortController: null,
+  searchDebounceTimer:   null,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -39,6 +41,7 @@ const state = {
   fxIntensity:           58,
   fxGlow:                30,
   refreshTimer:          null,
+  nextRefreshAt:         null,
   liveFeeds: {
     adsb: { status: "idle", source: "OpenSky ADS-B",  message: "Awaiting refresh", records: [], updatedAt: null },
     ais:  {
@@ -162,11 +165,13 @@ function cacheElements() {
     hudAlertCount:       document.getElementById("hud-alert-count"),
     liveRegionLabel:     document.getElementById("live-region-label"),
     liveLastRefresh:     document.getElementById("live-last-refresh"),
+    liveNextRefresh:     document.getElementById("live-next-refresh"),
     refreshNow:          document.getElementById("refresh-now"),
     btnFullscreen:       document.getElementById("btn-fullscreen"),
     searchInput:         document.getElementById("search-input"),
     searchButton:        document.getElementById("search-btn"),
     searchResults:       document.getElementById("search-results"),
+    searchMeta:          document.getElementById("search-meta"),
     hoverTooltip:        document.getElementById("hover-tooltip"),
     mobileDrawers:       document.getElementById("mobile-drawers"),
     mobileBackdrop:      document.getElementById("mobile-backdrop"),
@@ -239,7 +244,12 @@ function startWallClock() {
 
 function scheduleRefresh() {
   if (state.refreshTimer) window.clearInterval(state.refreshTimer);
-  state.refreshTimer = window.setInterval(() => refreshLiveFeeds(), state.refreshIntervalSec * 1000);
+  state.nextRefreshAt = Date.now() + state.refreshIntervalSec * 1000;
+  updateRefreshCountdown();
+  state.refreshTimer = window.setInterval(() => {
+    state.nextRefreshAt = Date.now() + state.refreshIntervalSec * 1000;
+    refreshLiveFeeds();
+  }, state.refreshIntervalSec * 1000);
 }
 
 function renderMetricCluster() {
@@ -380,7 +390,8 @@ function renderEventRail() {
     btn.addEventListener("click", () => {
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(alert.location.lng, alert.location.lat, 2600000),
-        duration: 1.8
+        duration: 1.8,
+        complete: () => applyRegionalContext(alert.title, alert.location.lng, alert.location.lat)
       });
     });
     elements.eventRail.appendChild(btn);
@@ -666,6 +677,8 @@ function updateLiveMetrics() {
   if (elements.hudTrackCount) elements.hudTrackCount.textContent = `${visibleTraffic} tracks`;
   if (elements.hudAlertCount) elements.hudAlertCount.textContent = `${activeAlerts} alerts`;
   if (elements.hudStatusText) elements.hudStatusText.textContent = "LIVE";
+  if (elements.liveRegionLabel) elements.liveRegionLabel.textContent = "Global Surveillance Active";
+  if (elements.hudStatusMode) elements.hudStatusMode.textContent = "LIVE FEED";
 
   if (elements.summaryStage) elements.summaryStage.textContent = "LIVE";
   if (elements.summaryCopy) {
@@ -675,6 +688,19 @@ function updateLiveMetrics() {
       ? `${state.liveFeeds.ais.records.length} vessels` : "AIS unconfigured";
     elements.summaryCopy.textContent = `${adsbMsg} \u00b7 ${aisMsg} \u00b7 ${visibleOrbits} orbital tracks monitored.`;
   }
+
+  if (state.regionFocus && Date.now() - state.regionFocus.timestamp < 120000) {
+    if (elements.liveRegionLabel) {
+      elements.liveRegionLabel.textContent = `${state.regionFocus.label.toUpperCase()} · ${state.regionFocus.tracks} tracks · ${state.regionFocus.alerts} alerts`;
+    }
+    if (elements.hudStatusMode) {
+      elements.hudStatusMode.textContent = "REGION FOCUS";
+    }
+    if (elements.summaryCopy) {
+      elements.summaryCopy.textContent = state.regionFocus.summary;
+    }
+  }
+
   if (elements.summaryTags) renderSummaryTags();
 }
 
@@ -837,6 +863,8 @@ async function refreshLiveFeeds() {
   const now = new Date().toLocaleTimeString([], { hour12: false });
   if (elements.liveLastRefresh) elements.liveLastRefresh.textContent = `Last refresh: ${now} UTC`;
   if (elements.hudStatusMode)   elements.hudStatusMode.textContent   = "LIVE FEED";
+  state.nextRefreshAt = Date.now() + state.refreshIntervalSec * 1000;
+  updateRefreshCountdown();
 }
 
 function pausePassiveSpin(duration = 5000) {
@@ -1006,7 +1034,23 @@ function startHudClock() {
     if (elements.hudUtc)      elements.hudUtc.textContent      = `UTC ${now.toUTCString().slice(17, 25)}`;
     if (elements.hudLocal)    elements.hudLocal.textContent    = `LOCAL ${now.toLocaleTimeString([], { hour12: false })}`;
     if (elements.summaryTime) elements.summaryTime.textContent = `${now.toUTCString().slice(17, 25)} UTC`;
+    updateRefreshCountdown();
   }, 250);
+}
+
+function updateRefreshCountdown() {
+  if (!elements.liveNextRefresh) return;
+  if (!state.nextRefreshAt) {
+    elements.liveNextRefresh.textContent = "Next refresh pending";
+    return;
+  }
+  const remainingMs = state.nextRefreshAt - Date.now();
+  if (remainingMs <= 0) {
+    elements.liveNextRefresh.textContent = "Refreshing now…";
+    return;
+  }
+  const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
+  elements.liveNextRefresh.textContent = `Next refresh in ${remainingSec}s`;
 }
 
 function updateFps() {
@@ -1018,41 +1062,390 @@ function updateFps() {
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
 
-async function runSearch(query) {
-  const trimmed = query.trim();
-  if (!trimmed) { elements.searchResults.classList.add("hidden"); return; }
-  if (state.searchAbortController) state.searchAbortController.abort();
-  state.searchAbortController = new AbortController();
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmed)}`,
-      { signal: state.searchAbortController.signal, headers: { Accept: "application/json" } }
-    );
-    renderSearchResults(await response.json());
-  } catch {
-    elements.searchResults.classList.add("hidden");
-  }
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
-function renderSearchResults(results) {
-  if (!results.length) { elements.searchResults.classList.add("hidden"); return; }
-  elements.searchResults.innerHTML = "";
-  results.forEach(r => {
+function normalizeSearchTerm(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function computeSearchScore(query, text) {
+  if (!query || !text) return 0;
+  const normalizedText = normalizeSearchTerm(text);
+  if (!normalizedText.includes(query)) return 0;
+  if (normalizedText === query) return 100;
+  if (normalizedText.startsWith(query)) return 70;
+  return 35;
+}
+
+function getEntityLngLat(entity) {
+  const position = entity?.position?.getValue?.(viewer.clock.currentTime);
+  if (!position) return null;
+  const cg = Cesium.Cartographic.fromCartesian(position);
+  return {
+    lng: Cesium.Math.toDegrees(cg.longitude),
+    lat: Cesium.Math.toDegrees(cg.latitude)
+  };
+}
+
+function getZoneCenter(zone) {
+  if (!zone) return null;
+  if (zone.kind === "rectangle") {
+    return {
+      lng: (zone.coordinates.west + zone.coordinates.east) / 2,
+      lat: (zone.coordinates.south + zone.coordinates.north) / 2
+    };
+  }
+  if (zone.kind === "polygon" && Array.isArray(zone.coordinates) && zone.coordinates.length) {
+    const sums = zone.coordinates.reduce((acc, [lng, lat]) => ({ lng: acc.lng + lng, lat: acc.lat + lat }), { lng: 0, lat: 0 });
+    return { lng: sums.lng / zone.coordinates.length, lat: sums.lat / zone.coordinates.length };
+  }
+  return null;
+}
+
+function buildOperationalSearchResults(query) {
+  const normalizedQuery = normalizeSearchTerm(query);
+  if (!normalizedQuery) return [];
+
+  const results = [];
+  const pushResult = (entry) => {
+    if (!entry?.score || entry.score <= 0) return;
+    results.push(entry);
+  };
+
+  SCENARIO.alerts.forEach(alert => {
+    const score = Math.max(
+      computeSearchScore(normalizedQuery, alert.title),
+      computeSearchScore(normalizedQuery, alert.region),
+      computeSearchScore(normalizedQuery, alert.summary),
+      computeSearchScore(normalizedQuery, alert.tags?.join(" "))
+    );
+    pushResult({
+      id: `alert:${alert.id}`,
+      kind: "alert",
+      title: alert.title,
+      subtitle: `${alert.region} · ${alert.summary}`,
+      meta: `${alert.location.lat.toFixed(2)}°, ${alert.location.lng.toFixed(2)}°`,
+      lng: alert.location.lng,
+      lat: alert.location.lat,
+      score
+    });
+  });
+
+  SCENARIO.incidents.forEach(incident => {
+    const score = Math.max(
+      computeSearchScore(normalizedQuery, incident.label),
+      computeSearchScore(normalizedQuery, incident.description),
+      computeSearchScore(normalizedQuery, "incident")
+    );
+    pushResult({
+      id: `incident:${incident.id}`,
+      kind: "incident",
+      title: incident.label,
+      subtitle: incident.description,
+      meta: `${incident.location.lat.toFixed(2)}°, ${incident.location.lng.toFixed(2)}°`,
+      lng: incident.location.lng,
+      lat: incident.location.lat,
+      score
+    });
+  });
+
+  SCENARIO.zones.forEach(zone => {
+    const center = getZoneCenter(zone);
+    if (!center) return;
+    const score = Math.max(
+      computeSearchScore(normalizedQuery, zone.label),
+      computeSearchScore(normalizedQuery, zone.id),
+      computeSearchScore(normalizedQuery, "zone")
+    );
+    pushResult({
+      id: `zone:${zone.id}`,
+      kind: "zone",
+      title: zone.label,
+      subtitle: "Airspace disruption / closure zone",
+      meta: `${center.lat.toFixed(2)}°, ${center.lng.toFixed(2)}°`,
+      lng: center.lng,
+      lat: center.lat,
+      score
+    });
+  });
+
+  state.bookmarks.forEach(bookmark => {
+    const score = Math.max(
+      computeSearchScore(normalizedQuery, bookmark.label),
+      computeSearchScore(normalizedQuery, "bookmark")
+    );
+    pushResult({
+      id: `bookmark:${bookmark.id}`,
+      kind: "bookmark",
+      title: bookmark.label,
+      subtitle: "Saved camera viewpoint",
+      meta: `${bookmark.destination.lat.toFixed(2)}°, ${bookmark.destination.lng.toFixed(2)}°`,
+      lng: bookmark.destination.lng,
+      lat: bookmark.destination.lat,
+      score
+    });
+  });
+
+  [...dynamic.liveTraffic, ...dynamic.traffic].forEach(entity => {
+    const info = getEntityInfo(entity);
+    const coords = getEntityLngLat(entity);
+    if (!info || !coords) return;
+    const score = Math.max(
+      computeSearchScore(normalizedQuery, info.label),
+      computeSearchScore(normalizedQuery, info.description),
+      computeSearchScore(normalizedQuery, info.type)
+    );
+    pushResult({
+      id: `track:${entity.id}`,
+      kind: "track",
+      title: info.label,
+      subtitle: `${info.type.toUpperCase()} · ${info.description || "Live monitored entity"}`,
+      meta: `${coords.lat.toFixed(2)}°, ${coords.lng.toFixed(2)}°`,
+      lng: coords.lng,
+      lat: coords.lat,
+      entityId: entity.id,
+      score
+    });
+  });
+
+  const deduped = new Map();
+  results.sort((a, b) => b.score - a.score).forEach(result => {
+    if (!deduped.has(result.id)) deduped.set(result.id, result);
+  });
+  return Array.from(deduped.values()).slice(0, 8);
+}
+
+function parseBoundingBox(rawBoundingBox) {
+  if (!Array.isArray(rawBoundingBox) || rawBoundingBox.length !== 4) return null;
+  const [southRaw, northRaw, westRaw, eastRaw] = rawBoundingBox.map(Number);
+  if ([southRaw, northRaw, westRaw, eastRaw].some(Number.isNaN)) return null;
+  const south = Math.min(southRaw, northRaw);
+  const north = Math.max(southRaw, northRaw);
+  const lonRawSpan = Math.abs(eastRaw - westRaw);
+  return {
+    south,
+    north,
+    west: westRaw,
+    east: eastRaw,
+    latSpan: Math.abs(north - south),
+    lonSpan: Math.min(lonRawSpan, 360 - lonRawSpan),
+    crossesDateLine: lonRawSpan > 180
+  };
+}
+
+function haversineKm(latA, lngA, latB, lngB) {
+  const toRad = value => value * Math.PI / 180;
+  const dLat = toRad(latB - latA);
+  const dLng = toRad(lngB - lngA);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(latA)) * Math.cos(toRad(latB)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function collectOperationalPoints() {
+  const points = [];
+
+  [...dynamic.liveTraffic, ...dynamic.traffic].forEach(entity => {
+    const info = getEntityInfo(entity);
+    const coords = getEntityLngLat(entity);
+    if (!info || !coords) return;
+    points.push({ kind: "track", label: info.label, lat: coords.lat, lng: coords.lng, entityId: entity.id });
+  });
+
+  SCENARIO.alerts.forEach(alert => {
+    points.push({ kind: "alert", label: alert.title, lat: alert.location.lat, lng: alert.location.lng });
+  });
+  SCENARIO.incidents.forEach(incident => {
+    points.push({ kind: "incident", label: incident.label, lat: incident.location.lat, lng: incident.location.lng });
+  });
+  SCENARIO.zones.forEach(zone => {
+    const center = getZoneCenter(zone);
+    if (center) points.push({ kind: "zone", label: zone.label, lat: center.lat, lng: center.lng });
+  });
+
+  return points;
+}
+
+function applyRegionalContext(label, lng, lat) {
+  const radiusKm = 1600;
+  const nearby = collectOperationalPoints()
+    .map(point => ({ ...point, distanceKm: haversineKm(lat, lng, point.lat, point.lng) }))
+    .filter(point => point.distanceKm <= radiusKm)
+    .sort((a, b) => a.distanceKm - b.distanceKm);
+
+  const nearbyTracks = nearby.filter(point => point.kind === "track").length;
+  const nearbyAlerts = nearby.filter(point => point.kind !== "track").length;
+
+  if (elements.liveRegionLabel) {
+    elements.liveRegionLabel.textContent = `${label.toUpperCase()} · ${nearbyTracks} tracks · ${nearbyAlerts} alerts`;
+  }
+  if (elements.hudStatusMode) {
+    elements.hudStatusMode.textContent = nearby.length ? "REGION FOCUS" : "LIVE FEED";
+  }
+  if (elements.summaryCopy) {
+    if (!nearby.length) {
+      elements.summaryCopy.textContent = `${label}: no nearby monitored assets in ${radiusKm.toLocaleString()} km. Live feeds continue to update globally.`;
+    } else {
+      const nearestPoint = nearby[0];
+      elements.summaryCopy.textContent = `${label}: ${nearbyTracks} tracked assets and ${nearbyAlerts} alerts within ${radiusKm.toLocaleString()} km. Nearest signal: ${nearestPoint.label} (${Math.round(nearestPoint.distanceKm)} km).`;
+    }
+  }
+  if (elements.searchMeta) {
+    elements.searchMeta.textContent = nearby.length
+      ? `Focused on ${label} · ${nearby.length} nearby signals`
+      : `Focused on ${label} · no nearby signals`;
+  }
+
+  const closestEntity = nearby.find(point => point.entityId);
+  if (closestEntity) {
+    const entity = viewer.entities.getById(closestEntity.entityId);
+    if (entity) {
+      state.selectedEntity = entity;
+      updateSelectedEntityCard(entity);
+    }
+  }
+
+  state.regionFocus = {
+    label,
+    tracks: nearbyTracks,
+    alerts: nearbyAlerts,
+    summary: !nearby.length
+      ? `${label}: no nearby monitored assets in ${radiusKm.toLocaleString()} km. Live feeds continue to update globally.`
+      : `${label}: ${nearbyTracks} tracked assets and ${nearbyAlerts} alerts within ${radiusKm.toLocaleString()} km. Nearest signal: ${nearby[0].label} (${Math.round(nearby[0].distanceKm)} km).`,
+    timestamp: Date.now()
+  };
+}
+
+function flyToSearchResult(result) {
+  if (!result) return;
+  pausePassiveSpin(7000);
+
+  if (result.kind === "geo") {
+    const bounds = parseBoundingBox(result.boundingbox);
+    const zoomHeight = clamp(Math.max(bounds?.latSpan ?? 8, bounds?.lonSpan ?? 8) * 150000, 1100000, 19000000);
+    const flyOptions = {
+      destination: Cesium.Cartesian3.fromDegrees(result.lng, result.lat, zoomHeight),
+      duration: 1.7,
+      complete: () => applyRegionalContext(result.title, result.lng, result.lat)
+    };
+    if (bounds && !bounds.crossesDateLine && (bounds.latSpan > 1.5 || bounds.lonSpan > 1.5)) {
+      flyOptions.destination = Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north);
+    }
+    viewer.camera.flyTo(flyOptions);
+    return;
+  }
+
+  if (result.entityId) {
+    const entity = viewer.entities.getById(result.entityId);
+    if (entity) {
+      state.selectedEntity = entity;
+      updateSelectedEntityCard(entity);
+    }
+  }
+
+  const height = result.kind === "track" ? 1800000 : result.kind === "zone" ? 2800000 : 2300000;
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(result.lng, result.lat, height),
+    duration: 1.5,
+    complete: () => applyRegionalContext(result.title, result.lng, result.lat)
+  });
+}
+
+async function runSearch(query) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    elements.searchResults.classList.add("hidden");
+    if (elements.searchMeta) elements.searchMeta.textContent = "Type a place or live object to jump into active context.";
+    return;
+  }
+
+  if (state.searchAbortController) state.searchAbortController.abort();
+  state.searchAbortController = new AbortController();
+
+  const operationalResults = buildOperationalSearchResults(trimmed);
+  if (elements.searchMeta) elements.searchMeta.textContent = "Searching global geospatial index…";
+
+  let placeResults = [];
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=7&q=${encodeURIComponent(trimmed)}`,
+      { signal: state.searchAbortController.signal, headers: { Accept: "application/json" } }
+    );
+    const payload = await response.json();
+    placeResults = Array.isArray(payload)
+      ? payload
+        .map(result => ({
+          id: `geo:${result.place_id}`,
+          kind: "geo",
+          title: result.display_name?.split(",")?.[0]?.trim() || "Unknown location",
+          subtitle: result.display_name ?? "Geographic result",
+          meta: `${result.type || "place"} · ${result.class || "geography"}`,
+          lng: Number(result.lon),
+          lat: Number(result.lat),
+          boundingbox: result.boundingbox ?? null
+        }))
+        .filter(result => Number.isFinite(result.lng) && Number.isFinite(result.lat))
+      : [];
+  } catch {
+    placeResults = [];
+  }
+
+  renderSearchResults(trimmed, operationalResults, placeResults);
+}
+
+function appendSearchGroup(label, results) {
+  if (!results.length) return;
+  const header = document.createElement("div");
+  header.className = "search-group-label";
+  header.textContent = label;
+  elements.searchResults.appendChild(header);
+
+  results.forEach(result => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "search-result";
-    btn.innerHTML = `<strong>${r.display_name.split(",")[0]}</strong><span>${r.display_name}</span>`;
+    btn.innerHTML = `
+      <span class="search-result-head">
+        <span class="search-result-kind">${escapeHtml(result.kind)}</span>
+        <strong>${escapeHtml(result.title)}</strong>
+      </span>
+      <span class="search-result-sub">${escapeHtml(result.subtitle)}</span>
+      <span class="search-result-meta">${escapeHtml(result.meta)}</span>
+    `;
     btn.addEventListener("click", () => {
       elements.searchResults.classList.add("hidden");
-      elements.searchInput.value = r.display_name;
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(Number(r.lon), Number(r.lat), 1800000),
-        duration: 1.6
-      });
+      elements.searchInput.value = result.title;
+      flyToSearchResult(result);
     });
     elements.searchResults.appendChild(btn);
   });
+}
+
+function renderSearchResults(query, operationalResults, placeResults) {
+  const op = operationalResults.slice(0, 6);
+  const geo = placeResults.slice(0, 6);
+  if (!op.length && !geo.length) {
+    elements.searchResults.classList.add("hidden");
+    if (elements.searchMeta) elements.searchMeta.textContent = `No matches found for “${query}”.`;
+    return;
+  }
+
+  elements.searchResults.innerHTML = "";
+  appendSearchGroup("Operational Matches", op);
+  appendSearchGroup("Geographic Matches", geo);
   elements.searchResults.classList.remove("hidden");
+
+  if (elements.searchMeta) {
+    const total = op.length + geo.length;
+    elements.searchMeta.textContent = `${total} results · ${op.length} operational · ${geo.length} geographic`;
+  }
 }
 
 function registerEvents() {
@@ -1121,11 +1514,26 @@ function registerEvents() {
   });
 
   elements.searchButton?.addEventListener("click",  () => runSearch(elements.searchInput.value));
+  elements.searchInput?.addEventListener("input", event => {
+    if (state.searchDebounceTimer) window.clearTimeout(state.searchDebounceTimer);
+    state.searchDebounceTimer = window.setTimeout(() => runSearch(event.target.value), 220);
+  });
+  elements.searchInput?.addEventListener("focus", () => {
+    if (elements.searchInput.value.trim()) runSearch(elements.searchInput.value);
+  });
   elements.searchInput?.addEventListener("keydown", event => {
     if (event.key === "Enter") { event.preventDefault(); runSearch(elements.searchInput.value); }
   });
+  document.addEventListener("click", event => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (!target.closest(".hud-search")) elements.searchResults.classList.add("hidden");
+  });
 
-  elements.btnHome?.addEventListener("click",  () => viewer.camera.flyTo({ destination: homeView, duration: 1.6 }));
+  elements.btnHome?.addEventListener("click",  () => {
+    state.regionFocus = null;
+    viewer.camera.flyTo({ destination: homeView, duration: 1.6 });
+  });
   elements.btnTilt?.addEventListener("click",  () => {
     state.tiltMode = !state.tiltMode;
     elements.btnTilt.classList.toggle("active", state.tiltMode);

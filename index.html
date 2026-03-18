@@ -22,14 +22,15 @@
         <span class="logo-icon">◈</span>
         <div>
           <div class="logo-text">GOD'S EYE</div>
-          <div class="logo-sub">Live global surveillance · real-time traffic · orbital monitoring</div>
+          <div class="logo-sub">Global intelligence command center · live traffic · orbital monitoring</div>
         </div>
       </div>
 
       <div class="hud-search">
-        <input type="text" id="search-input" class="search-input" placeholder="Search any place on Earth..." autocomplete="off" />
+        <input type="text" id="search-input" class="search-input" placeholder="Search country, city, flight, alert, or zone..." autocomplete="off" />
         <button id="search-btn" class="search-btn" type="button" title="Search">⌕</button>
         <div id="search-results" class="search-results hidden"></div>
+        <div id="search-meta" class="search-meta">Type a place or live object to jump into active context.</div>
       </div>
 
       <div class="hud-clock-block">
@@ -167,6 +168,7 @@
       <div id="live-status-center">
         <span class="timeline-title" id="live-region-label">Global Surveillance Active</span>
         <span id="live-last-refresh" class="live-caption">Feeds refreshing…</span>
+        <span id="live-next-refresh" class="live-caption">Next refresh in --s</span>
       </div>
       <div id="live-status-right">
         <button id="refresh-now" class="transport-btn" type="button">Refresh Now</button>
