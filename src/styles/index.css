@@ -218,7 +218,7 @@ canvas {
 .panel-kicker,
 .control-group h3,
 .timeline-title,
-#timeline-caption,
+.live-caption,
 #summary-time,
 #summary-stage,
 .metric-label,
@@ -739,7 +739,7 @@ canvas {
 
 #floating-summary {
   left: 50%;
-  bottom: 106px;
+  bottom: 90px;
   transform: translateX(-50%);
   width: min(620px, calc(100vw - 720px));
   min-width: 360px;
@@ -940,7 +940,7 @@ canvas {
   bottom: 16px;
   z-index: 22;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
   align-items: center;
   padding: 14px 16px;
@@ -950,64 +950,36 @@ canvas {
   backdrop-filter: blur(18px);
 }
 
-#transport-controls {
+#live-status-left {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
-#timeline-shell {
+#live-status-center {
   display: grid;
-  gap: 12px;
+  gap: 4px;
 }
 
-#timeline-meta {
+#live-status-right {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.timeline-title {
-  color: var(--cyan);
-  letter-spacing: 0.16em;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-}
-
-#timeline-caption {
+.live-caption {
   color: var(--muted);
   font-size: 0.72rem;
 }
 
-#timeline-track {
-  position: relative;
-  padding-top: 14px;
-}
-
-#timeline-markers {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 12px;
-}
-
-.timeline-marker {
-  position: absolute;
-  top: 0;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.timeline-marker.active {
-  background: var(--cyan);
-  border-color: rgba(126, 224, 255, 0.5);
-  box-shadow: 0 0 18px rgba(126, 224, 255, 0.4);
+.timeline-title {
+  color: var(--cyan);
+  letter-spacing: 0.14em;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  font-family: "Share Tech Mono", monospace;
 }
 
 .object-label {
@@ -1021,7 +993,6 @@ canvas {
 }
 
 body.declutter-ui .panel-kicker,
-body.declutter-ui #timeline-caption,
 body.declutter-ui .event-summary,
 body.declutter-ui #summary-tags,
 body.declutter-ui .logo-sub {

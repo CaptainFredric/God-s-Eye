@@ -6,16 +6,16 @@
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Panopticon Earth</title>
+  <title>God's Eye — Live Global Surveillance</title>
   <meta
     name="description"
-    content="Panopticon Earth is a Google-Earth-like geospatial intelligence globe with replay controls, simulated traffic, orbital tracks, and cinematic operator tooling."
+    content="God's Eye is a real-time global surveillance dashboard with live ADS-B aircraft, maritime tracks, orbital passes, and geopolitical overlays."
   />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-Da1oONLx.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-gbzL96Ck.css">
+  <script type="module" crossorigin src="./assets/index-C5RqGe2n.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DjxhNq0f.css">
 </head>
 <body>
   <div id="app">
@@ -25,8 +25,8 @@
       <div class="hud-logo">
         <span class="logo-icon">◈</span>
         <div>
-          <div class="logo-text">PANOPTICON EARTH</div>
-          <div class="logo-sub">Interactive globe · replay traffic · orbital monitoring</div>
+          <div class="logo-text">GOD'S EYE</div>
+          <div class="logo-sub">Live global surveillance · real-time traffic · orbital monitoring</div>
         </div>
       </div>
 
@@ -114,9 +114,9 @@
           <strong id="fx-glow-value">30</strong>
         </label>
         <label class="slider-row">
-          <span>Replay Speed</span>
-          <input id="replay-speed" type="range" min="1" max="30" value="8" />
-          <strong id="replay-speed-value">8×</strong>
+          <span>Refresh (s)</span>
+          <input id="refresh-interval" type="range" min="30" max="300" step="30" value="90" />
+          <strong id="refresh-interval-value">90s</strong>
         </label>
       </section>
 
@@ -130,7 +130,7 @@
       </section>
 
       <section class="control-group">
-        <h3>Timeline Highlights</h3>
+        <h3>Live Alerts</h3>
         <div id="event-rail" class="event-rail"></div>
       </section>
 
@@ -155,29 +155,26 @@
 
     <section id="floating-summary" class="glass-panel">
       <div class="summary-head">
-        <span id="summary-stage">Monitoring</span>
-        <span id="summary-time">T+00:00Z</span>
+        <span id="summary-stage">LIVE</span>
+        <span id="summary-time">--:--:-- UTC</span>
       </div>
-      <p id="summary-copy">Panopticon Earth combines air, maritime, orbital, and event overlays in one globe view.</p>
+      <p id="summary-copy">God's Eye aggregates live ADS-B, AIS vessel data, orbital passes, and geopolitical overlays in real time.</p>
       <div id="summary-tags" class="summary-tags"></div>
     </section>
 
     <footer id="hud-bottom">
-      <div id="transport-controls">
-        <button id="play-toggle" class="transport-btn primary" type="button">Play</button>
-        <button id="pause-toggle" class="transport-btn" type="button">Pause</button>
-        <button id="reset-toggle" class="transport-btn" type="button">Reset</button>
+      <div id="live-status-left">
+        <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-mode">LIVE FEED</span></span>
+        <span id="hud-track-count" class="hud-chip">— tracks</span>
+        <span id="hud-alert-count" class="hud-chip">— alerts</span>
       </div>
-
-      <div id="timeline-shell">
-        <div id="timeline-meta">
-          <span class="timeline-title">World Replay</span>
-          <span id="timeline-caption">Traffic, closures, and orbital passes shown over time.</span>
-        </div>
-        <div id="timeline-track">
-          <div id="timeline-markers"></div>
-          <input id="timeline-slider" type="range" min="0" max="100" value="0" step="1" />
-        </div>
+      <div id="live-status-center">
+        <span class="timeline-title" id="live-region-label">Global Surveillance Active</span>
+        <span id="live-last-refresh" class="live-caption">Feeds refreshing…</span>
+      </div>
+      <div id="live-status-right">
+        <button id="refresh-now" class="transport-btn" type="button">Refresh Now</button>
+        <button id="btn-fullscreen" class="transport-btn" type="button">Fullscreen</button>
       </div>
     </footer>
 

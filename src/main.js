@@ -4,86 +4,84 @@ import { fetchLiveFeeds, fetchAisFeed, getConfiguredAisEndpoint, setConfiguredAi
 const Cesium = await loadCesium();
 
 function normalizeCesiumModule(module) {
-  if (module?.Viewer) {
-    return module;
-  }
-  if (module?.default?.Viewer) {
-    return module.default;
-  }
+  if (module?.Viewer) return module;
+  if (module?.default?.Viewer) return module.default;
   return module?.default ?? module;
 }
 
 async function loadCesium() {
-  if (globalThis.Cesium?.Viewer) {
-    return globalThis.Cesium;
-  }
+  if (globalThis.Cesium?.Viewer) return globalThis.Cesium;
   return normalizeCesiumModule(await import("cesium"));
 }
 
-const replayStart = Cesium.JulianDate.fromDate(new Date(Date.UTC(2026, 2, 17, 0, 0, 0)));
-const replayStop = Cesium.JulianDate.addMinutes(replayStart, SCENARIO.durationMinutes, new Cesium.JulianDate());
 const UI_STORAGE_KEYS = {
   declutter: "panopticon-earth-declutter",
-  compact: "panopticon-earth-compact"
+  compact:   "panopticon-earth-compact"
 };
 
 const state = {
-  selectedEntity: null,
-  trackedEntity: null,
-  hoveredEntity: null,
-  spinning: true,
-  spinPausedUntil: 0,
-  activeDrawer: null,
-  intelSheetOpen: false,
-  declutter: loadJson(UI_STORAGE_KEYS.declutter, false),
-  compact: loadJson(UI_STORAGE_KEYS.compact, false),
-  tiltMode: false,
+  selectedEntity:        null,
+  trackedEntity:         null,
+  hoveredEntity:         null,
+  spinning:              true,
+  spinPausedUntil:       0,
+  activeDrawer:          null,
+  intelSheetOpen:        false,
+  declutter:             loadJson(UI_STORAGE_KEYS.declutter, false),
+  compact:               loadJson(UI_STORAGE_KEYS.compact, false),
+  tiltMode:              false,
   searchAbortController: null,
-  basemapId: loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
-  fxMode: loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
-  bookmarks: loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
-  layers: loadJson(STORAGE_KEYS.layers, Object.fromEntries(LAYERS.map(layer => [layer.id, layer.enabled]))),
-  replaySpeed: 8,
-  fxIntensity: 58,
-  fxGlow: 30,
+  basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
+  fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
+  bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
+  layers:                loadJson(STORAGE_KEYS.layers, Object.fromEntries(LAYERS.map(l => [l.id, l.enabled]))),
+  refreshIntervalSec:    90,
+  fxIntensity:           58,
+  fxGlow:                30,
+  refreshTimer:          null,
   liveFeeds: {
-    adsb: { status: "idle", source: "OpenSky ADS-B", message: "Awaiting refresh", records: [], updatedAt: null },
-    ais: { status: getConfiguredAisEndpoint() ? "idle" : "config-required", source: "AIS Adapter", message: getConfiguredAisEndpoint() ? "Awaiting refresh" : "Configure a CORS-safe AIS endpoint", records: [], updatedAt: null }
+    adsb: { status: "idle", source: "OpenSky ADS-B",  message: "Awaiting refresh", records: [], updatedAt: null },
+    ais:  {
+      status:  getConfiguredAisEndpoint() ? "idle" : "config-required",
+      source:  "AIS Adapter",
+      message: getConfiguredAisEndpoint() ? "Awaiting refresh" : "Configure a CORS-safe AIS endpoint",
+      records: [], updatedAt: null
+    }
   }
 };
 
 const elements = {};
 const dynamic = {
-  trails: [],
-  zones: [],
-  incidents: [],
-  traffic: [],
-  rings: [],
-  radars: [],
+  trails:      [],
+  zones:       [],
+  incidents:   [],
+  traffic:     [],
+  rings:       [],
+  radars:      [],
   liveTraffic: []
 };
 
 let frameSamples = [];
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
-  animation: false,
-  timeline: false,
-  baseLayerPicker: false,
-  geocoder: false,
-  homeButton: false,
-  sceneModePicker: false,
+  animation:            false,
+  timeline:             false,
+  baseLayerPicker:      false,
+  geocoder:             false,
+  homeButton:           false,
+  sceneModePicker:      false,
   navigationHelpButton: false,
-  fullscreenButton: false,
-  infoBox: false,
-  selectionIndicator: false,
-  requestRenderMode: false,
-  shouldAnimate: false,
-  terrain: undefined
+  fullscreenButton:     false,
+  infoBox:              false,
+  selectionIndicator:   false,
+  requestRenderMode:    false,
+  shouldAnimate:        false,
+  terrain:              undefined
 });
 
 const postStages = {
   blackAndWhite: Cesium.PostProcessStageLibrary.createBlackAndWhiteStage(),
-  brightness: Cesium.PostProcessStageLibrary.createBrightnessStage()
+  brightness:    Cesium.PostProcessStageLibrary.createBrightnessStage()
 };
 const bloomStage = viewer.scene.postProcessStages.bloom;
 viewer.scene.postProcessStages.add(postStages.blackAndWhite);
@@ -93,16 +91,11 @@ if (bloomStage) {
   bloomStage.enabled = true;
   bloomStage.uniforms.glowOnly = false;
 }
-viewer.scene.globe.enableLighting = true;
-viewer.scene.skyAtmosphere.show = true;
+viewer.scene.globe.enableLighting          = true;
+viewer.scene.skyAtmosphere.show            = true;
 viewer.scene.globe.depthTestAgainstTerrain = false;
-viewer.clock.startTime = replayStart.clone();
-viewer.clock.stopTime = replayStop.clone();
-viewer.clock.currentTime = replayStart.clone();
-viewer.clock.clockRange = Cesium.ClockRange.CLAMPED;
-viewer.clock.multiplier = 60 * state.replaySpeed;
-viewer.clock.shouldAnimate = true;
-viewer.resolutionScale = Math.min(window.devicePixelRatio || 1, 1.6);
+viewer.clock.shouldAnimate                 = false;
+viewer.resolutionScale                     = Math.min(window.devicePixelRatio || 1, 1.6);
 
 const homeView = Cesium.Cartesian3.fromDegrees(
   SCENARIO.initialView.lng,
@@ -113,8 +106,8 @@ viewer.camera.setView({
   destination: homeView,
   orientation: {
     heading: SCENARIO.initialView.heading,
-    pitch: SCENARIO.initialView.pitch,
-    roll: SCENARIO.initialView.roll
+    pitch:   SCENARIO.initialView.pitch,
+    roll:    SCENARIO.initialView.roll
   }
 });
 
@@ -129,173 +122,153 @@ renderBasemapButtons();
 renderLayerToggles();
 renderBookmarks();
 renderFxButtons();
-renderTimelineMarkers();
 installBasemap(state.basemapId);
 seedScene();
 renderFeedStatus();
 registerEvents();
 elements.btnSpin.classList.toggle("active", state.spinning);
-updateScene(viewer.clock.currentTime);
 startHudClock();
+startWallClock();
+renderEventRail();
+scheduleRefresh();
 refreshLiveFeeds();
-window.setInterval(refreshLiveFeeds, 90000);
 viewer.scene.requestRender();
 
 function cacheElements() {
   Object.assign(elements, {
-    metricCluster: document.getElementById("metric-cluster"),
-    basemapButtons: document.getElementById("basemap-buttons"),
-    layerToggles: document.getElementById("layer-toggles"),
-    bookmarkList: document.getElementById("bookmark-list"),
-    saveBookmark: document.getElementById("save-bookmark"),
-    clearBookmarks: document.getElementById("clear-bookmarks"),
-    fxModeButtons: document.getElementById("fx-mode-buttons"),
-    fxIntensity: document.getElementById("fx-intensity"),
-    fxIntensityValue: document.getElementById("fx-intensity-value"),
-    fxGlow: document.getElementById("fx-glow"),
-    fxGlowValue: document.getElementById("fx-glow-value"),
-    replaySpeed: document.getElementById("replay-speed"),
-    replaySpeedValue: document.getElementById("replay-speed-value"),
-    entityInfo: document.getElementById("entity-info"),
-    trackSelected: document.getElementById("track-selected"),
-    releaseTrack: document.getElementById("release-track"),
-    eventRail: document.getElementById("event-rail"),
-    summaryStage: document.getElementById("summary-stage"),
-    summaryTime: document.getElementById("summary-time"),
-    summaryCopy: document.getElementById("summary-copy"),
-    summaryTags: document.getElementById("summary-tags"),
-    playToggle: document.getElementById("play-toggle"),
-    pauseToggle: document.getElementById("pause-toggle"),
-    resetToggle: document.getElementById("reset-toggle"),
-    timelineSlider: document.getElementById("timeline-slider"),
-    timelineMarkers: document.getElementById("timeline-markers"),
-    searchInput: document.getElementById("search-input"),
-    searchButton: document.getElementById("search-btn"),
-    searchResults: document.getElementById("search-results"),
-    hoverTooltip: document.getElementById("hover-tooltip"),
-    mobileDrawers: document.getElementById("mobile-drawers"),
-    mobileBackdrop: document.getElementById("mobile-backdrop"),
-    btnMobileLayers: document.getElementById("btn-mobile-layers"),
-    btnMobileControls: document.getElementById("btn-mobile-controls"),
-    btnMobileIntel: document.getElementById("btn-mobile-intel"),
-    feedStatus: document.getElementById("feed-status"),
-    refreshFeeds: document.getElementById("refresh-feeds"),
-    aisEndpoint: document.getElementById("ais-endpoint"),
-    saveAisEndpoint: document.getElementById("save-ais-endpoint"),
-    clearAisEndpoint: document.getElementById("clear-ais-endpoint"),
-    testAisEndpoint: document.getElementById("test-ais-endpoint"),
-    feedHint: document.getElementById("feed-hint"),
-    intelSheet: document.getElementById("intel-sheet"),
-    closeIntelSheet: document.getElementById("close-intel-sheet"),
-    intelSheetKicker: document.getElementById("intel-sheet-kicker"),
-    intelSheetTitle: document.getElementById("intel-sheet-title"),
-    intelSheetOverview: document.getElementById("intel-sheet-overview"),
+    metricCluster:       document.getElementById("metric-cluster"),
+    basemapButtons:      document.getElementById("basemap-buttons"),
+    layerToggles:        document.getElementById("layer-toggles"),
+    bookmarkList:        document.getElementById("bookmark-list"),
+    saveBookmark:        document.getElementById("save-bookmark"),
+    clearBookmarks:      document.getElementById("clear-bookmarks"),
+    fxModeButtons:       document.getElementById("fx-mode-buttons"),
+    fxIntensity:         document.getElementById("fx-intensity"),
+    fxIntensityValue:    document.getElementById("fx-intensity-value"),
+    fxGlow:              document.getElementById("fx-glow"),
+    fxGlowValue:         document.getElementById("fx-glow-value"),
+    refreshInterval:     document.getElementById("refresh-interval"),
+    refreshIntervalVal:  document.getElementById("refresh-interval-value"),
+    entityInfo:          document.getElementById("entity-info"),
+    trackSelected:       document.getElementById("track-selected"),
+    releaseTrack:        document.getElementById("release-track"),
+    eventRail:           document.getElementById("event-rail"),
+    summaryStage:        document.getElementById("summary-stage"),
+    summaryTime:         document.getElementById("summary-time"),
+    summaryCopy:         document.getElementById("summary-copy"),
+    summaryTags:         document.getElementById("summary-tags"),
+    hudStatusMode:       document.getElementById("hud-status-mode"),
+    hudTrackCount:       document.getElementById("hud-track-count"),
+    hudAlertCount:       document.getElementById("hud-alert-count"),
+    liveRegionLabel:     document.getElementById("live-region-label"),
+    liveLastRefresh:     document.getElementById("live-last-refresh"),
+    refreshNow:          document.getElementById("refresh-now"),
+    btnFullscreen:       document.getElementById("btn-fullscreen"),
+    searchInput:         document.getElementById("search-input"),
+    searchButton:        document.getElementById("search-btn"),
+    searchResults:       document.getElementById("search-results"),
+    hoverTooltip:        document.getElementById("hover-tooltip"),
+    mobileDrawers:       document.getElementById("mobile-drawers"),
+    mobileBackdrop:      document.getElementById("mobile-backdrop"),
+    btnMobileLayers:     document.getElementById("btn-mobile-layers"),
+    btnMobileControls:   document.getElementById("btn-mobile-controls"),
+    btnMobileIntel:      document.getElementById("btn-mobile-intel"),
+    feedStatus:          document.getElementById("feed-status"),
+    refreshFeeds:        document.getElementById("refresh-feeds"),
+    aisEndpoint:         document.getElementById("ais-endpoint"),
+    saveAisEndpoint:     document.getElementById("save-ais-endpoint"),
+    clearAisEndpoint:    document.getElementById("clear-ais-endpoint"),
+    testAisEndpoint:     document.getElementById("test-ais-endpoint"),
+    feedHint:            document.getElementById("feed-hint"),
+    intelSheet:          document.getElementById("intel-sheet"),
+    closeIntelSheet:     document.getElementById("close-intel-sheet"),
+    intelSheetKicker:    document.getElementById("intel-sheet-kicker"),
+    intelSheetTitle:     document.getElementById("intel-sheet-title"),
+    intelSheetOverview:  document.getElementById("intel-sheet-overview"),
     intelSheetTelemetry: document.getElementById("intel-sheet-telemetry"),
-    intelSheetAssessment: document.getElementById("intel-sheet-assessment"),
-    intelSheetTimeline: document.getElementById("intel-sheet-timeline"),
-    hudUtc: document.getElementById("hud-utc"),
-    hudLocal: document.getElementById("hud-local"),
-    hudFps: document.getElementById("hud-fps"),
-    hudCamera: document.getElementById("hud-camera"),
-    hudStatusText: document.getElementById("hud-status-text"),
-    btnDeclutter: document.getElementById("btn-declutter"),
-    btnDensity: document.getElementById("btn-density"),
-    btnHome: document.getElementById("btn-home"),
-    btnTilt: document.getElementById("btn-tilt"),
-    btnSpin: document.getElementById("btn-spin")
+    intelSheetAssessment:document.getElementById("intel-sheet-assessment"),
+    intelSheetTimeline:  document.getElementById("intel-sheet-timeline"),
+    hudUtc:              document.getElementById("hud-utc"),
+    hudLocal:            document.getElementById("hud-local"),
+    hudFps:              document.getElementById("hud-fps"),
+    hudCamera:           document.getElementById("hud-camera"),
+    hudStatusText:       document.getElementById("hud-status-text"),
+    btnDeclutter:        document.getElementById("btn-declutter"),
+    btnDensity:          document.getElementById("btn-density"),
+    btnHome:             document.getElementById("btn-home"),
+    btnTilt:             document.getElementById("btn-tilt"),
+    btnSpin:             document.getElementById("btn-spin")
   });
 
-  elements.fxIntensity.value = String(state.fxIntensity);
-  elements.fxGlow.value = String(state.fxGlow);
-  elements.replaySpeed.value = String(state.replaySpeed);
-  elements.timelineSlider.max = String(SCENARIO.durationMinutes);
-  if (elements.aisEndpoint) {
-    elements.aisEndpoint.value = getConfiguredAisEndpoint();
-  }
+  if (elements.fxIntensity)    elements.fxIntensity.value   = String(state.fxIntensity);
+  if (elements.fxGlow)         elements.fxGlow.value        = String(state.fxGlow);
+  if (elements.refreshInterval) elements.refreshInterval.value = String(state.refreshIntervalSec);
+  if (elements.aisEndpoint)    elements.aisEndpoint.value   = getConfiguredAisEndpoint();
 }
 
 function loadJson(key, fallback) {
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+  } catch { return fallback; }
 }
 
 function saveJson(key, value) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-  }
+  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
-function minuteToTime(minute) {
-  return Cesium.JulianDate.addMinutes(replayStart, minute, new Cesium.JulianDate());
+function nowJulian() {
+  return Cesium.JulianDate.fromDate(new Date());
 }
 
-function currentMinute(currentTime = viewer.clock.currentTime) {
-  return clamp(Cesium.JulianDate.secondsDifference(currentTime, replayStart) / 60, 0, SCENARIO.durationMinutes);
+function startWallClock() {
+  window.setInterval(() => {
+    viewer.clock.currentTime = nowJulian();
+    updateHudFrame();
+    updateAmbientEffects();
+    updateSelectedEntityCard(state.selectedEntity);
+    updateLiveMetrics();
+    updateZones();
+    updateIncidents();
+    if (state.spinning && performance.now() >= state.spinPausedUntil && !state.trackedEntity) {
+      viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, Cesium.Math.toRadians(0.012));
+    }
+    viewer.scene.requestRender();
+  }, 200);
 }
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function formatMinute(minute) {
-  const whole = Math.round(minute);
-  const hours = String(Math.floor(whole / 60)).padStart(2, "0");
-  const minutes = String(whole % 60).padStart(2, "0");
-  return `T+${hours}:${minutes}Z`;
-}
-
-function installBasemap(basemapId) {
-  state.basemapId = basemapId;
-  saveJson(STORAGE_KEYS.basemap, basemapId);
-  viewer.imageryLayers.removeAll();
-  const basemap = BASEMAPS.find(item => item.id === basemapId) || BASEMAPS[0];
-  const provider = basemap.type === "osm"
-    ? new Cesium.OpenStreetMapImageryProvider({ url: basemap.url })
-    : new Cesium.UrlTemplateImageryProvider({ url: basemap.url, credit: basemap.credit });
-  viewer.imageryLayers.addImageryProvider(provider);
-  renderBasemapButtons();
+function scheduleRefresh() {
+  if (state.refreshTimer) window.clearInterval(state.refreshTimer);
+  state.refreshTimer = window.setInterval(() => refreshLiveFeeds(), state.refreshIntervalSec * 1000);
 }
 
 function renderMetricCluster() {
   const metrics = [
-    { key: "tracks", label: "Tracks", value: "0", foot: "Visible traffic" },
-    { key: "alerts", label: "Alerts", value: "0", foot: "Active disruptions" },
-    { key: "orbits", label: "Orbit", value: "0", foot: "Overhead passes" },
-    { key: "tempo", label: "Tempo", value: `${state.replaySpeed}×`, foot: "Replay speed" }
+    { key: "tracks", label: "Tracks",  value: "\u2014", foot: "Live traffic" },
+    { key: "alerts", label: "Alerts",  value: "\u2014", foot: "Active zones" },
+    { key: "orbits", label: "Orbit",   value: "\u2014", foot: "Overhead passes" },
+    { key: "feeds",  label: "Feeds",   value: "\u2014", foot: "Data sources live" }
   ];
-  elements.metricCluster.innerHTML = metrics.map(metric => `
-    <article class="metric-card" data-metric="${metric.key}">
-      <span class="metric-label">${metric.label}</span>
-      <strong class="metric-value">${metric.value}</strong>
-      <span class="metric-foot">${metric.foot}</span>
+  elements.metricCluster.innerHTML = metrics.map(m => `
+    <article class="metric-card" data-metric="${m.key}">
+      <span class="metric-label">${m.label}</span>
+      <strong class="metric-value">${m.value}</strong>
+      <span class="metric-foot">${m.foot}</span>
     </article>
   `).join("");
 }
 
 function updateMetricCard(key, value, foot) {
   const card = elements.metricCluster.querySelector(`[data-metric="${key}"]`);
-  if (!card) {
-    return;
-  }
-  const valueElement = card.querySelector(".metric-value");
-  const footElement = card.querySelector(".metric-foot");
-  if (valueElement) {
-    valueElement.textContent = String(value);
-  }
-  if (footElement) {
-    footElement.textContent = foot;
-  }
+  if (!card) return;
+  const v = card.querySelector(".metric-value");
+  const f = card.querySelector(".metric-foot");
+  if (v) v.textContent = String(value);
+  if (f) f.textContent = foot;
 }
 
 function renderFeedStatus() {
-  if (!elements.feedStatus) {
-    return;
-  }
+  if (!elements.feedStatus) return;
   const feeds = [state.liveFeeds.adsb, state.liveFeeds.ais];
   elements.feedStatus.innerHTML = feeds.map(feed => `
     <article class="feed-card ${feed.status}">
@@ -330,12 +303,12 @@ function applyDensityMode() {
 function renderBasemapButtons() {
   elements.basemapButtons.innerHTML = "";
   BASEMAPS.forEach(basemap => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `basemap-btn${state.basemapId === basemap.id ? " active" : ""}`;
-    button.textContent = basemap.label;
-    button.addEventListener("click", () => installBasemap(basemap.id));
-    elements.basemapButtons.appendChild(button);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `basemap-btn${state.basemapId === basemap.id ? " active" : ""}`;
+    btn.textContent = basemap.label;
+    btn.addEventListener("click", () => installBasemap(basemap.id));
+    elements.basemapButtons.appendChild(btn);
   });
 }
 
@@ -358,7 +331,6 @@ function renderLayerToggles() {
       saveJson(STORAGE_KEYS.layers, state.layers);
       renderLayerToggles();
       refreshEntityVisibility();
-      updateScene(viewer.clock.currentTime);
     });
     elements.layerToggles.appendChild(row);
   });
@@ -369,9 +341,9 @@ function renderBookmarks() {
   state.bookmarks.forEach(bookmark => {
     const row = document.createElement("div");
     row.className = "bookmark-item";
-    row.innerHTML = `<button type="button">${bookmark.label}</button><button type="button" data-remove="${bookmark.id}">✕</button>`;
+    row.innerHTML = `<button type="button">${bookmark.label}</button><button type="button" data-remove="${bookmark.id}">\u2715</button>`;
     row.firstElementChild.addEventListener("click", () => flyToBookmark(bookmark));
-    row.lastElementChild.addEventListener("click", () => removeBookmark(bookmark.id));
+    row.lastElementChild.addEventListener("click",  () => removeBookmark(bookmark.id));
     elements.bookmarkList.appendChild(row);
   });
 }
@@ -379,60 +351,72 @@ function renderBookmarks() {
 function renderFxButtons() {
   elements.fxModeButtons.innerHTML = "";
   FX_MODES.forEach(mode => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `fx-btn${state.fxMode === mode.id ? " active" : ""}`;
-    button.textContent = mode.label;
-    button.addEventListener("click", () => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `fx-btn${state.fxMode === mode.id ? " active" : ""}`;
+    btn.textContent = mode.label;
+    btn.addEventListener("click", () => {
       state.fxMode = mode.id;
       saveJson(STORAGE_KEYS.fxMode, state.fxMode);
       applyFxMode(mode.id);
       renderFxButtons();
     });
-    elements.fxModeButtons.appendChild(button);
+    elements.fxModeButtons.appendChild(btn);
   });
 }
 
-function renderTimelineMarkers() {
-  elements.timelineMarkers.innerHTML = "";
-  SCENARIO.events.forEach(event => {
-    const marker = document.createElement("button");
-    marker.type = "button";
-    marker.className = "timeline-marker";
-    marker.style.left = `${(event.minute / SCENARIO.durationMinutes) * 100}%`;
-    marker.title = `${formatMinute(event.minute)} · ${event.title}`;
-    marker.addEventListener("click", () => jumpToMinute(event.minute));
-    elements.timelineMarkers.appendChild(marker);
+function renderEventRail() {
+  elements.eventRail.innerHTML = "";
+  SCENARIO.alerts.forEach(alert => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "event-item";
+    btn.dataset.alertId = alert.id;
+    btn.innerHTML = `
+      <span class="event-minute">${alert.region}</span>
+      <span class="event-title">${alert.title}</span>
+      <span class="event-summary">${alert.summary}</span>
+    `;
+    btn.addEventListener("click", () => {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(alert.location.lng, alert.location.lat, 2600000),
+        duration: 1.8
+      });
+    });
+    elements.eventRail.appendChild(btn);
   });
+}
+
+function minuteToRealJulian(offsetMinutes) {
+  return Cesium.JulianDate.addMinutes(nowJulian(), offsetMinutes - SCENARIO.durationMinutes / 2, new Cesium.JulianDate());
 }
 
 function seedScene() {
-  const commercialTraffic = [...SCENARIO.flights.commercial, ...generateTrafficVariants(SCENARIO.flights.commercial, "COM", 1, 0.9, 0.5)];
-  const militaryTraffic = [...SCENARIO.flights.military, ...generateTrafficVariants(SCENARIO.flights.military, "MIL", 1, 0.45, 0.28)];
-  const maritimeTraffic = [...SCENARIO.maritime, ...generateTrafficVariants(SCENARIO.maritime, "SEA", 1, 0.35, 0.22)];
-  createTrafficEntities(commercialTraffic, "commercial", Cesium.Color.fromCssColorString("#7ee0ff"), 55 * 60);
-  createTrafficEntities(militaryTraffic, "military", Cesium.Color.fromCssColorString("#ffbe5c"), 80 * 60);
-  createTrafficEntities(SCENARIO.satellites, "satellites", Cesium.Color.fromCssColorString("#af9dff"), 120 * 60, 8);
-  createTrafficEntities(maritimeTraffic, "maritime", Cesium.Color.fromCssColorString("#60f7bf"), 120 * 60, 7);
+  const commercial = [...SCENARIO.flights.commercial, ...generateVariants(SCENARIO.flights.commercial, "COM", 1, 0.9, 0.5)];
+  const military   = [...SCENARIO.flights.military,   ...generateVariants(SCENARIO.flights.military,   "MIL", 1, 0.45, 0.28)];
+  const maritime   = [...SCENARIO.maritime,            ...generateVariants(SCENARIO.maritime,           "SEA", 1, 0.35, 0.22)];
+  createTrafficEntities(commercial,          "commercial", Cesium.Color.fromCssColorString("#7ee0ff"), 3600 * 8);
+  createTrafficEntities(military,            "military",   Cesium.Color.fromCssColorString("#ffbe5c"), 3600 * 12, 9);
+  createTrafficEntities(SCENARIO.satellites, "satellites", Cesium.Color.fromCssColorString("#af9dff"), 3600 * 24, 8);
+  createTrafficEntities(maritime,            "maritime",   Cesium.Color.fromCssColorString("#60f7bf"), 3600 * 24, 7);
   createZones();
   createIncidents();
-  renderEventRail();
 }
 
-function generateTrafficVariants(items, prefix, variantCount, lngDrift, latDrift) {
-  return items.flatMap((item, itemIndex) => Array.from({ length: variantCount }, (_, variantIndex) => {
-    const driftFactor = itemIndex + variantIndex + 1;
+function generateVariants(items, prefix, count, lngDrift, latDrift) {
+  return items.flatMap((item, i) => Array.from({ length: count }, (_, v) => {
+    const d = i + v + 1;
     return {
       ...item,
-      id: `${item.id}-${prefix.toLowerCase()}-${variantIndex + 1}`,
-      label: `${prefix}-${String(driftFactor).padStart(2, "0")}`,
-      description: `${item.description} Auxiliary model track used for density and continuity.`,
-      showLabel: false,
-      positions: item.positions.map((point, pointIndex) => ({
-        ...point,
-        lng: point.lng + Math.sin((pointIndex + 1) * 0.8 + driftFactor) * lngDrift,
-        lat: point.lat + Math.cos((pointIndex + 1) * 0.6 + driftFactor) * latDrift,
-        minute: clamp(point.minute + variantIndex, 0, SCENARIO.durationMinutes)
+      id:          `${item.id}-${prefix.toLowerCase()}-${v + 1}`,
+      label:       `${prefix}-${String(d).padStart(2, "0")}`,
+      description: `${item.description} Auxiliary model track.`,
+      showLabel:   false,
+      positions:   item.positions.map((pt, pi) => ({
+        ...pt,
+        lng:    pt.lng + Math.sin((pi + 1) * 0.8 + d) * lngDrift,
+        lat:    pt.lat + Math.cos((pi + 1) * 0.6 + d) * latDrift,
+        minute: clamp(pt.minute + v, 0, SCENARIO.durationMinutes)
       }))
     };
   }));
@@ -441,10 +425,10 @@ function generateTrafficVariants(items, prefix, variantCount, lngDrift, latDrift
 function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) {
   items.forEach(item => {
     const position = new Cesium.SampledPositionProperty();
-    item.positions.forEach(point => {
+    item.positions.forEach(pt => {
       position.addSample(
-        minuteToTime(point.minute),
-        Cesium.Cartesian3.fromDegrees(point.lng, point.lat, point.altitude ?? item.altitude ?? 0)
+        minuteToRealJulian(pt.minute),
+        Cesium.Cartesian3.fromDegrees(pt.lng, pt.lat, pt.altitude ?? item.altitude ?? 0)
       );
     });
     position.setInterpolationOptions({
@@ -463,115 +447,98 @@ function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) 
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       },
       path: {
-        show: true,
-        width: layerId === "satellites" ? 1.6 : 2.3,
-        material: color.withAlpha(layerId === "satellites" ? 0.5 : 0.8),
+        show:       true,
+        width:      layerId === "satellites" ? 1.6 : 2.3,
+        material:   color.withAlpha(layerId === "satellites" ? 0.5 : 0.8),
         trailTime,
-        leadTime: 0,
+        leadTime:   0,
         resolution: 120
       },
       label: item.showLabel === false ? undefined : {
         text: item.label,
         font: '12px "Share Tech Mono"',
-        fillColor: Cesium.Color.WHITE,
-        showBackground: true,
-        backgroundColor: Cesium.Color.fromCssColorString("rgba(5,12,23,0.75)"),
+        fillColor:        Cesium.Color.WHITE,
+        showBackground:   true,
+        backgroundColor:  Cesium.Color.fromCssColorString("rgba(5,12,23,0.75)"),
         horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
-        pixelOffset: new Cesium.Cartesian2(12, -10),
+        pixelOffset:      new Cesium.Cartesian2(12, -10),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scale: 0.85,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 18000000)
       },
       properties: {
         layerId,
-        label: item.label,
+        label:       item.label,
         description: item.description,
-        entityType: layerId,
-        altitude: item.altitude ?? 0,
-        synthetic: item.showLabel === false
+        entityType:  layerId,
+        altitude:    item.altitude ?? 0,
+        synthetic:   item.showLabel === false
       }
     });
     entity._basePixelSize = pixelSize;
-    entity._pulseSeed = Math.random() * Math.PI * 2;
-    entity._layerColor = color;
+    entity._pulseSeed     = Math.random() * Math.PI * 2;
+    entity._layerColor    = color;
     dynamic.traffic.push(entity);
-    if (layerId === "military") {
-      createRadarSweep(entity, color);
-    }
+    if (layerId === "military") createRadarSweep(entity, color);
   });
 }
 
 function destinationPoint(latDeg, lngDeg, distanceMeters, bearingDeg) {
-  const angularDistance = distanceMeters / 6378137;
-  const bearing = Cesium.Math.toRadians(bearingDeg);
+  const d   = distanceMeters / 6378137;
+  const brg = Cesium.Math.toRadians(bearingDeg);
   const lat = Cesium.Math.toRadians(latDeg);
   const lng = Cesium.Math.toRadians(lngDeg);
-  const targetLat = Math.asin(
-    Math.sin(lat) * Math.cos(angularDistance) +
-    Math.cos(lat) * Math.sin(angularDistance) * Math.cos(bearing)
-  );
-  const targetLng = lng + Math.atan2(
-    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat),
-    Math.cos(angularDistance) - Math.sin(lat) * Math.sin(targetLat)
-  );
-  return {
-    lat: Cesium.Math.toDegrees(targetLat),
-    lng: Cesium.Math.toDegrees(targetLng)
-  };
+  const tLat = Math.asin(Math.sin(lat) * Math.cos(d) + Math.cos(lat) * Math.sin(d) * Math.cos(brg));
+  const tLng = lng + Math.atan2(Math.sin(brg) * Math.sin(d) * Math.cos(lat), Math.cos(d) - Math.sin(lat) * Math.sin(tLat));
+  return { lat: Cesium.Math.toDegrees(tLat), lng: Cesium.Math.toDegrees(tLng) };
 }
 
-function headingBetweenPositions(current, next) {
-  if (!current || !next) {
-    return 0;
-  }
-  const currentCartographic = Cesium.Cartographic.fromCartesian(current);
-  const nextCartographic = Cesium.Cartographic.fromCartesian(next);
-  const dLon = nextCartographic.longitude - currentCartographic.longitude;
-  const y = Math.sin(dLon) * Math.cos(nextCartographic.latitude);
-  const x =
-    Math.cos(currentCartographic.latitude) * Math.sin(nextCartographic.latitude) -
-    Math.sin(currentCartographic.latitude) * Math.cos(nextCartographic.latitude) * Math.cos(dLon);
+function headingBetweenPositions(a, b) {
+  if (!a || !b) return 0;
+  const ac = Cesium.Cartographic.fromCartesian(a);
+  const bc = Cesium.Cartographic.fromCartesian(b);
+  const dL = bc.longitude - ac.longitude;
+  const y  = Math.sin(dL) * Math.cos(bc.latitude);
+  const x  = Math.cos(ac.latitude) * Math.sin(bc.latitude) - Math.sin(ac.latitude) * Math.cos(bc.latitude) * Math.cos(dL);
   return (Cesium.Math.toDegrees(Math.atan2(y, x)) + 360) % 360;
 }
 
 function createRadarSweep(entity, color) {
-  const radarColor = color.brighten(0.2, new Cesium.Color());
+  const rc = color.brighten(0.2, new Cesium.Color());
   const radarEntity = viewer.entities.add({
     id: `${entity.id}-radar`,
     polygon: {
       hierarchy: new Cesium.CallbackProperty(() => {
-        const currentPosition = entity.position?.getValue?.(viewer.clock.currentTime);
-        const aheadTime = Cesium.JulianDate.addSeconds(viewer.clock.currentTime, 45, new Cesium.JulianDate());
-        const futurePosition = entity.position?.getValue?.(aheadTime);
-        if (!currentPosition) {
-          return undefined;
+        const now  = viewer.clock.currentTime;
+        const cur  = entity.position?.getValue?.(now);
+        const fwd  = entity.position?.getValue?.(Cesium.JulianDate.addSeconds(now, 45, new Cesium.JulianDate()));
+        if (!cur) return undefined;
+        const cg   = Cesium.Cartographic.fromCartesian(cur);
+        const cLat = Cesium.Math.toDegrees(cg.latitude);
+        const cLng = Cesium.Math.toDegrees(cg.longitude);
+        const baseH = headingBetweenPositions(cur, fwd);
+        const sweep = baseH + Math.sin(performance.now() / 700 + entity._pulseSeed) * 62;
+        const half  = 18;
+        const range = 260000;
+        const pts   = [cLng, cLat];
+        for (let s = 0; s <= 12; s++) {
+          const brg = sweep - half + (s / 12) * half * 2;
+          const pt  = destinationPoint(cLat, cLng, range, brg);
+          pts.push(pt.lng, pt.lat);
         }
-        const currentCartographic = Cesium.Cartographic.fromCartesian(currentPosition);
-        const centerLat = Cesium.Math.toDegrees(currentCartographic.latitude);
-        const centerLng = Cesium.Math.toDegrees(currentCartographic.longitude);
-        const baseHeading = headingBetweenPositions(currentPosition, futurePosition);
-        const sweepHeading = baseHeading + Math.sin(currentMinute() * 0.9 + entity._pulseSeed) * 62;
-        const halfAngle = 18;
-        const rangeMeters = 260000;
-        const sectorPoints = [centerLng, centerLat];
-        for (let step = 0; step <= 12; step += 1) {
-          const bearing = sweepHeading - halfAngle + (step / 12) * halfAngle * 2;
-          const point = destinationPoint(centerLat, centerLng, rangeMeters, bearing);
-          sectorPoints.push(point.lng, point.lat);
-        }
-        return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(sectorPoints));
+        return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(pts));
       }, false),
-      material: radarColor.withAlpha(0.14),
-      outline: true,
-      outlineColor: radarColor.withAlpha(0.42),
+      material:          rc.withAlpha(0.14),
+      outline:           true,
+      outlineColor:      rc.withAlpha(0.42),
       perPositionHeight: false,
-      height: 0
+      height:            0
     },
     properties: {
-      layerId: "military",
-      label: `${entity.properties.label.getValue(viewer.clock.currentTime)} Radar Sweep`,
-      description: "Ground-projected radar search cone linked to military track heading.",
-      entityType: "radar"
+      layerId:     "military",
+      label:       `${entity.properties.label.getValue(viewer.clock.currentTime)} Radar Sweep`,
+      description: "Ground-projected radar search cone.",
+      entityType:  "radar"
     }
   });
   radarEntity._pulseSeed = entity._pulseSeed;
@@ -587,47 +554,31 @@ function createZones() {
         id: zone.id,
         rectangle: {
           coordinates: Cesium.Rectangle.fromDegrees(
-            zone.coordinates.west,
-            zone.coordinates.south,
-            zone.coordinates.east,
-            zone.coordinates.north
+            zone.coordinates.west, zone.coordinates.south,
+            zone.coordinates.east, zone.coordinates.north
           ),
-          material: color.withAlpha(zone.fill),
-          outline: true,
+          material:     color.withAlpha(zone.fill),
+          outline:      true,
           outlineColor: color.withAlpha(0.75),
-          height: 0
+          height:       0
         },
-        properties: {
-          layerId: "zones",
-          label: zone.label,
-          description: `${zone.label} active window`,
-          entityType: "zone",
-          start: zone.start,
-          end: zone.end
-        }
+        properties: { layerId: "zones", label: zone.label, description: zone.label, entityType: "zone" }
       });
     } else {
       entity = viewer.entities.add({
         id: zone.id,
         polygon: {
-          hierarchy: Cesium.Cartesian3.fromDegreesArray(zone.coordinates.flat()),
-          material: color.withAlpha(zone.fill),
-          outline: true,
+          hierarchy:    Cesium.Cartesian3.fromDegreesArray(zone.coordinates.flat()),
+          material:     color.withAlpha(zone.fill),
+          outline:      true,
           outlineColor: color.withAlpha(0.8),
           perPositionHeight: false
         },
-        properties: {
-          layerId: "zones",
-          label: zone.label,
-          description: `${zone.label} active window`,
-          entityType: "zone",
-          start: zone.start,
-          end: zone.end
-        }
+        properties: { layerId: "zones", label: zone.label, description: zone.label, entityType: "zone" }
       });
     }
     entity._zoneColor = color;
-    entity._baseFill = zone.fill;
+    entity._baseFill  = zone.fill;
     entity._pulseSeed = Math.random() * Math.PI * 2;
     dynamic.zones.push({ entity, zone });
   });
@@ -639,28 +590,21 @@ function createIncidents() {
       id: incident.id,
       position: Cesium.Cartesian3.fromDegrees(incident.location.lng, incident.location.lat, 1500),
       billboard: {
-        image: createMarkerSvg("#ff6d8d", incident.label.slice(0, 1)),
-        scale: 0.9,
+        image:          createMarkerSvg("#ff6d8d", incident.label.slice(0, 1)),
+        scale:          0.9,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       },
       label: {
-        text: incident.label,
-        font: '12px "Share Tech Mono"',
-        fillColor: Cesium.Color.WHITE,
+        text:           incident.label,
+        font:           '12px "Share Tech Mono"',
+        fillColor:      Cesium.Color.WHITE,
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString("rgba(5,12,23,0.75)"),
-        pixelOffset: new Cesium.Cartesian2(0, -42),
+        pixelOffset:    new Cesium.Cartesian2(0, -42),
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       },
-      properties: {
-        layerId: "incidents",
-        label: incident.label,
-        description: incident.description,
-        entityType: "incident",
-        start: incident.start,
-        end: incident.end
-      }
+      properties: { layerId: "incidents", label: incident.label, description: incident.description, entityType: "incident" }
     });
     entity._pulseSeed = Math.random() * Math.PI * 2;
     dynamic.incidents.push({ entity, incident });
@@ -671,10 +615,10 @@ function createIncidents() {
       ellipse: {
         semiMajorAxis: 180000,
         semiMinorAxis: 180000,
-        material: Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.09),
-        outline: true,
+        material:     Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.09),
+        outline:      true,
         outlineColor: Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.4),
-        height: 0
+        height:       0
       }
     });
     ring._pulseSeed = Math.random() * Math.PI * 2;
@@ -689,135 +633,120 @@ function createMarkerSvg(color, text) {
 
 function refreshEntityVisibility() {
   dynamic.traffic.forEach(entity => {
-    const layerId = entity.properties.layerId.getValue();
-    entity.show = !!state.layers[layerId];
+    entity.show = !!state.layers[entity.properties.layerId.getValue()];
   });
   dynamic.radars.forEach(({ entity }) => {
     entity.show = !!state.layers.military;
   });
   dynamic.liveTraffic.forEach(entity => {
-    const layerId = entity.properties.layerId.getValue(viewer.clock.currentTime);
-    entity.show = !!state.layers[layerId];
+    entity.show = !!state.layers[entity.properties.layerId.getValue(viewer.clock.currentTime)];
   });
 }
 
-function pausePassiveSpin(duration = 5000) {
-  state.spinPausedUntil = performance.now() + duration;
+function updateZones() {
+  dynamic.zones.forEach(({ entity }) => { entity.show = !!state.layers.zones; });
 }
 
-function focusCameraOnCartesian(cartesian, duration = 1.6) {
-  if (!cartesian) {
-    return;
+function updateIncidents() {
+  dynamic.incidents.forEach(({ entity }) => { entity.show = !!state.layers.incidents; });
+  dynamic.rings.forEach(({ entity })     => { entity.show = !!state.layers.incidents; });
+}
+
+function updateLiveMetrics() {
+  const visibleTraffic = dynamic.traffic.filter(e => e.show).length + dynamic.liveTraffic.filter(e => e.show).length;
+  const activeAlerts   = dynamic.incidents.filter(({ entity }) => entity.show).length + dynamic.zones.filter(({ entity }) => entity.show).length;
+  const visibleOrbits  = dynamic.traffic.filter(e => e.show && e.properties.layerId.getValue(viewer.clock.currentTime) === "satellites").length;
+  const liveFeeds      = [state.liveFeeds.adsb, state.liveFeeds.ais].filter(f => f.status === "live").length;
+
+  updateMetricCard("tracks", visibleTraffic, `${Math.max(1, Math.round(visibleTraffic * 0.35))} sectors monitored`);
+  updateMetricCard("alerts", activeAlerts,   activeAlerts ? "Active disruptions" : "No disruptions");
+  updateMetricCard("orbits", visibleOrbits,  "Overhead coverage");
+  updateMetricCard("feeds",  liveFeeds,      liveFeeds === 2 ? "All sources live" : liveFeeds === 1 ? "Partial live" : "Feeds loading");
+
+  if (elements.hudTrackCount) elements.hudTrackCount.textContent = `${visibleTraffic} tracks`;
+  if (elements.hudAlertCount) elements.hudAlertCount.textContent = `${activeAlerts} alerts`;
+  if (elements.hudStatusText) elements.hudStatusText.textContent = "LIVE";
+
+  if (elements.summaryStage) elements.summaryStage.textContent = "LIVE";
+  if (elements.summaryCopy) {
+    const adsbMsg = state.liveFeeds.adsb.status === "live"
+      ? `${state.liveFeeds.adsb.records.length} aircraft` : "ADS-B pending";
+    const aisMsg  = state.liveFeeds.ais.status === "live"
+      ? `${state.liveFeeds.ais.records.length} vessels` : "AIS unconfigured";
+    elements.summaryCopy.textContent = `${adsbMsg} \u00b7 ${aisMsg} \u00b7 ${visibleOrbits} orbital tracks monitored.`;
   }
-  const cartographic = Cesium.Cartographic.fromCartesian(cartesian);
-  const targetHeight = clamp(viewer.camera.positionCartographic.height * 0.55, 900000, 5500000);
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, targetHeight),
-    orientation: {
-      heading: viewer.camera.heading,
-      pitch: Cesium.Math.toRadians(-52),
-      roll: 0
-    },
-    duration
+  if (elements.summaryTags) renderSummaryTags();
+}
+
+function renderSummaryTags() {
+  const active = LAYERS.filter(l => state.layers[l.id]).map(l => l.label);
+  elements.summaryTags.innerHTML = active.slice(0, 5).map(t => `<span class="summary-tag">${t}</span>`).join("");
+}
+
+function updateHudFrame() {
+  updateFps();
+}
+
+function updateAmbientEffects() {
+  const phase = performance.now() / 700;
+  dynamic.traffic.forEach(entity => {
+    if (!entity.show || !entity.point) return;
+    const layerId    = entity.properties.layerId.getValue(viewer.clock.currentTime);
+    const pulseRange = layerId === "military" ? 1.8 : layerId === "commercial" ? 0.9 : layerId === "satellites" ? 0.6 : 0.7;
+    entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase + entity._pulseSeed)) * pulseRange;
   });
-}
-
-function clickedCartesian(position, picked) {
-  if (picked?.id?.position) {
-    return picked.id.position.getValue(viewer.clock.currentTime);
-  }
-  return viewer.scene.pickPositionSupported
-    ? viewer.scene.pickPosition(position)
-    : viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
-}
-
-function getEntityInfo(entity) {
-  if (!entity) {
-    return null;
-  }
-  const props = entity.properties;
-  const label = props?.label?.getValue?.(viewer.clock.currentTime) ?? entity.id;
-  const description = props?.description?.getValue?.(viewer.clock.currentTime) ?? "";
-  const type = props?.entityType?.getValue?.(viewer.clock.currentTime) ?? "unknown";
-  const position = entity.position?.getValue?.(viewer.clock.currentTime);
-  let locationMeta = "Static overlay";
-  if (position) {
-    const cartographic = Cesium.Cartographic.fromCartesian(position);
-    locationMeta = `${Cesium.Math.toDegrees(cartographic.latitude).toFixed(2)}°, ${Cesium.Math.toDegrees(cartographic.longitude).toFixed(2)}°`;
-  }
-  const altitude = props?.altitude?.getValue?.(viewer.clock.currentTime) ?? 0;
-  const synthetic = !!props?.synthetic?.getValue?.(viewer.clock.currentTime);
-  return { label, description, type, locationMeta, altitude, synthetic };
-}
-
-function hideHoverTooltip() {
-  elements.hoverTooltip.classList.add("hidden");
-}
-
-function showHoverTooltip(entity, screenPosition) {
-  const info = getEntityInfo(entity);
-  if (!info) {
-    hideHoverTooltip();
-    return;
-  }
-  elements.hoverTooltip.innerHTML = `
-    <strong>${info.label}</strong>
-    <span>${info.type.toUpperCase()}</span>
-    <p>${info.description || info.locationMeta}</p>
-  `;
-  elements.hoverTooltip.style.left = `${screenPosition.x + 18}px`;
-  elements.hoverTooltip.style.top = `${screenPosition.y + 18}px`;
-  elements.hoverTooltip.classList.remove("hidden");
-}
-
-function updateLiveMetrics(minute) {
-  const visibleTraffic = dynamic.traffic.filter(entity => entity.show).length + dynamic.liveTraffic.filter(entity => entity.show).length;
-  const activeAlerts = dynamic.incidents.filter(({ entity }) => entity.show).length + dynamic.zones.filter(({ entity }) => entity.show).length;
-  const visibleOrbits = dynamic.traffic.filter(entity => entity.show && entity.properties.layerId.getValue(viewer.clock.currentTime) === "satellites").length;
-  const currentEvent = latestEvent(minute);
-  updateMetricCard("tracks", visibleTraffic, `${Math.max(1, Math.round(visibleTraffic * 0.35))} sectors hot`);
-  updateMetricCard("alerts", activeAlerts, activeAlerts ? "Disruptions active" : "Monitoring nominal");
-  updateMetricCard("orbits", visibleOrbits, `${currentEvent.tags[0]?.toUpperCase() ?? "GLOBAL"} watch`);
-  updateMetricCard("tempo", `${state.replaySpeed}×`, viewer.clock.shouldAnimate ? "Realtime replay" : "Paused review");
-  if (elements.hudStatusText) {
-    elements.hudStatusText.textContent = currentEvent.title.toUpperCase();
-  }
-}
-
-function renderIntelTimeline(entity) {
-  const info = getEntityInfo(entity);
-  const activeEvent = latestEvent(currentMinute());
-  return [
-    { kicker: "Current", copy: `${info.label} aligned with ${activeEvent.title}` },
-    { kicker: "Previous", copy: `${formatMinute(Math.max(0, currentMinute() - 8))} · Last verified position update` },
-    { kicker: "Next", copy: `${formatMinute(Math.min(SCENARIO.durationMinutes, currentMinute() + 12))} · Continue watchlist monitoring` }
-  ];
+  dynamic.liveTraffic.forEach(entity => {
+    if (!entity.show || !entity.point) return;
+    entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase * 1.15 + entity._pulseSeed)) * 1.6;
+  });
+  dynamic.incidents.forEach(({ entity }) => {
+    if (!entity.show || !entity.billboard) return;
+    entity.billboard.scale = 0.9 + (Math.sin(phase * 1.6 + entity._pulseSeed) + 1) * 0.08;
+  });
+  dynamic.zones.forEach(({ entity }) => {
+    if (!entity.show) return;
+    const alpha = entity._baseFill + (Math.sin(phase + entity._pulseSeed) + 1) * 0.02;
+    if (entity.rectangle) entity.rectangle.material = entity._zoneColor.withAlpha(alpha);
+    if (entity.polygon)   entity.polygon.material   = entity._zoneColor.withAlpha(alpha);
+  });
+  dynamic.rings.forEach(({ entity }) => {
+    if (!entity.show || !entity.ellipse) return;
+    const pulse = (Math.sin(phase + entity._pulseSeed) + 1) / 2;
+    entity.ellipse.semiMajorAxis = 160000 + pulse * 90000;
+    entity.ellipse.semiMinorAxis = 160000 + pulse * 90000;
+    entity.ellipse.material = Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.05 + pulse * 0.08);
+  });
 }
 
 function openIntelSheet(entity) {
   const info = getEntityInfo(entity);
-  if (!info || !elements.intelSheet) {
-    return;
-  }
+  if (!info || !elements.intelSheet) return;
   state.intelSheetOpen = true;
   document.body.classList.add("intel-sheet-open");
   elements.intelSheet.classList.remove("hidden");
   elements.intelSheet.setAttribute("aria-hidden", "false");
-  elements.intelSheetKicker.textContent = `${info.type.toUpperCase()} DETAILS`;
-  elements.intelSheetTitle.textContent = info.label;
-  elements.intelSheetOverview.textContent = info.description || "Track selected for further review.";
+  elements.intelSheetKicker.textContent   = `${info.type.toUpperCase()} \u2014 LIVE TRACK`;
+  elements.intelSheetTitle.textContent    = info.label;
+  elements.intelSheetOverview.textContent = info.description || "Track selected for review.";
+  const now = new Date();
   elements.intelSheetTelemetry.innerHTML = `
     <div>${info.locationMeta}</div>
     <div>Altitude: ${Math.round(info.altitude).toLocaleString()} m</div>
-    <div>Status: ${viewer.clock.shouldAnimate ? "Replay running" : "Replay paused"}</div>
+    <div>Status: LIVE MONITORING</div>
     <div>Class: ${info.synthetic ? "Auxiliary model track" : "Primary track"}</div>
   `;
   elements.intelSheetAssessment.innerHTML = `
-    <div>${info.type === "military" || info.type === "radar" ? "Military-linked track with active radar coverage." : "Traffic track contributing to current route density."}</div>
-    <div>Active event: ${latestEvent(currentMinute()).title}</div>
-    <div>Feed context: ${info.type.startsWith("live-") ? "Live feed adapter" : "Scenario replay model"}</div>
+    <div>${info.type === "military" || info.type === "radar"
+      ? "Military-linked track with active radar coverage."
+      : "Traffic track contributing to current route density."}</div>
+    <div>Feed: ${info.type.startsWith("live-") ? "Live feed adapter" : "Static backdrop overlay"}</div>
+    <div>Last updated: ${now.toUTCString().slice(17, 25)} UTC</div>
   `;
-  elements.intelSheetTimeline.innerHTML = renderIntelTimeline(entity).map(item => `
+  elements.intelSheetTimeline.innerHTML = [
+    { kicker: "Now",  copy: `${info.label} under active surveillance` },
+    { kicker: "Feed", copy: info.type.startsWith("live-") ? "Real-time ADS-B / AIS data" : "Static backdrop model track" },
+    { kicker: "Next", copy: "Continue monitoring \u2014 auto-refresh active" }
+  ].map(item => `
     <div class="intel-timeline-item">
       <strong>${item.kicker}</strong>
       <span>${item.copy}</span>
@@ -828,31 +757,24 @@ function openIntelSheet(entity) {
 function closeIntelSheet() {
   state.intelSheetOpen = false;
   document.body.classList.remove("intel-sheet-open");
-  if (!elements.intelSheet) {
-    return;
-  }
+  if (!elements.intelSheet) return;
   elements.intelSheet.classList.add("hidden");
   elements.intelSheet.setAttribute("aria-hidden", "true");
 }
 
 async function testAisEndpoint() {
-  if (!elements.feedHint) {
-    return;
-  }
-  elements.feedHint.textContent = "Testing AIS endpoint...";
+  if (!elements.feedHint) return;
+  elements.feedHint.textContent = "Testing AIS endpoint\u2026";
   const result = await fetchAisFeed();
-  const count = result.records?.length ?? 0;
-  if (result.status === "live") {
-    elements.feedHint.textContent = `AIS endpoint OK: ${count} vessel tracks available.`;
-    return;
-  }
-  elements.feedHint.textContent = `AIS test: ${result.message}`;
+  elements.feedHint.textContent = result.status === "live"
+    ? `AIS OK: ${result.records?.length ?? 0} vessel tracks.`
+    : `AIS test: ${result.message}`;
 }
 
 function setMobileDrawer(drawer) {
   state.activeDrawer = state.activeDrawer === drawer ? null : drawer;
-  document.body.classList.toggle("mobile-drawer-open", !!state.activeDrawer);
-  document.body.classList.toggle("mobile-layers-open", state.activeDrawer === "layers");
+  document.body.classList.toggle("mobile-drawer-open",    !!state.activeDrawer);
+  document.body.classList.toggle("mobile-layers-open",   state.activeDrawer === "layers");
   document.body.classList.toggle("mobile-controls-open", state.activeDrawer === "controls");
   elements.mobileBackdrop.classList.toggle("hidden", !state.activeDrawer);
 }
@@ -868,39 +790,40 @@ function addLiveTrafficEntities(records, layerId, color, entityType) {
       id: record.id,
       position: Cesium.Cartesian3.fromDegrees(record.lng, record.lat, record.altitude ?? 0),
       point: {
-        pixelSize: layerId === "maritime" ? 7 : 8,
+        pixelSize:    layerId === "maritime" ? 7 : 8,
         color,
         outlineColor: Cesium.Color.WHITE.withAlpha(0.6),
         outlineWidth: 1,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
       },
       label: {
-        text: record.label,
-        font: '11px "Share Tech Mono"',
-        fillColor: Cesium.Color.WHITE,
+        text:           record.label,
+        font:           '11px "Share Tech Mono"',
+        fillColor:      Cesium.Color.WHITE,
         showBackground: true,
         backgroundColor: Cesium.Color.fromCssColorString("rgba(4,10,18,0.68)"),
-        pixelOffset: new Cesium.Cartesian2(10, -8),
+        pixelOffset:    new Cesium.Cartesian2(10, -8),
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scale: 0.76,
         distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 12000000)
       },
       properties: {
         layerId,
-        label: record.label,
+        label:       record.label,
         description: `${record.source} live feed`,
         entityType,
-        altitude: record.altitude ?? 0,
-        synthetic: false
+        altitude:    record.altitude ?? 0,
+        synthetic:   false
       }
     });
     entity._basePixelSize = layerId === "maritime" ? 7 : 8;
-    entity._pulseSeed = Math.random() * Math.PI * 2;
+    entity._pulseSeed     = Math.random() * Math.PI * 2;
     dynamic.liveTraffic.push(entity);
   });
 }
 
 async function refreshLiveFeeds() {
+  if (elements.liveLastRefresh) elements.liveLastRefresh.textContent = "Refreshing feeds\u2026";
   state.liveFeeds = await fetchLiveFeeds();
   renderFeedStatus();
   clearLiveTraffic();
@@ -911,352 +834,63 @@ async function refreshLiveFeeds() {
     addLiveTrafficEntities(state.liveFeeds.ais.records, "maritime", Cesium.Color.fromCssColorString("#7bffcb"), "live-ais");
   }
   refreshEntityVisibility();
-  updateScene(viewer.clock.currentTime);
+  const now = new Date().toLocaleTimeString([], { hour12: false });
+  if (elements.liveLastRefresh) elements.liveLastRefresh.textContent = `Last refresh: ${now} UTC`;
+  if (elements.hudStatusMode)   elements.hudStatusMode.textContent   = "LIVE FEED";
 }
 
-function updateAmbientEffects() {
-  const phase = performance.now() / 700;
-  dynamic.traffic.forEach(entity => {
-    if (!entity.show || !entity.point) {
-      return;
-    }
-    const layerId = entity.properties.layerId.getValue(viewer.clock.currentTime);
-    const pulseRange = layerId === "military" ? 1.8 : layerId === "commercial" ? 0.9 : layerId === "satellites" ? 0.6 : 0.7;
-    entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase + entity._pulseSeed)) * pulseRange;
-  });
+function pausePassiveSpin(duration = 5000) {
+  state.spinPausedUntil = performance.now() + duration;
+}
 
-  dynamic.liveTraffic.forEach(entity => {
-    if (!entity.show || !entity.point) {
-      return;
-    }
-    entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase * 1.15 + entity._pulseSeed)) * 1.6;
-  });
-
-  dynamic.incidents.forEach(({ entity }) => {
-    if (!entity.show || !entity.billboard) {
-      return;
-    }
-    entity.billboard.scale = 0.9 + (Math.sin(phase * 1.6 + entity._pulseSeed) + 1) * 0.08;
-  });
-
-  dynamic.zones.forEach(({ entity }) => {
-    if (!entity.show) {
-      return;
-    }
-    const alpha = entity._baseFill + (Math.sin(phase + entity._pulseSeed) + 1) * 0.02;
-    if (entity.rectangle) {
-      entity.rectangle.material = entity._zoneColor.withAlpha(alpha);
-    }
-    if (entity.polygon) {
-      entity.polygon.material = entity._zoneColor.withAlpha(alpha);
-    }
-  });
-
-  dynamic.rings.forEach(({ entity }) => {
-    if (!entity.show || !entity.ellipse) {
-      return;
-    }
-    const pulse = (Math.sin(phase + entity._pulseSeed) + 1) / 2;
-    entity.ellipse.semiMajorAxis = 160000 + pulse * 90000;
-    entity.ellipse.semiMinorAxis = 160000 + pulse * 90000;
-    entity.ellipse.material = Cesium.Color.fromCssColorString("#ff6d8d").withAlpha(0.05 + pulse * 0.08);
+function focusCameraOnCartesian(cartesian, duration = 1.6) {
+  if (!cartesian) return;
+  const cg           = Cesium.Cartographic.fromCartesian(cartesian);
+  const targetHeight = clamp(viewer.camera.positionCartographic.height * 0.55, 900000, 5500000);
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromRadians(cg.longitude, cg.latitude, targetHeight),
+    orientation: { heading: viewer.camera.heading, pitch: Cesium.Math.toRadians(-52), roll: 0 },
+    duration
   });
 }
 
-function renderEventRail() {
-  elements.eventRail.innerHTML = "";
-  SCENARIO.events.forEach(event => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "event-item";
-    button.dataset.eventId = event.id;
-    button.innerHTML = `
-      <span class="event-minute">${formatMinute(event.minute)}</span>
-      <span class="event-title">${event.title}</span>
-      <span class="event-summary">${event.summary}</span>
-    `;
-    button.addEventListener("click", () => {
-      jumpToMinute(event.minute);
-      viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(event.location.lng, event.location.lat, 2600000) });
-    });
-    elements.eventRail.appendChild(button);
-  });
+function clickedCartesian(position, picked) {
+  if (picked?.id?.position) return picked.id.position.getValue(viewer.clock.currentTime);
+  return viewer.scene.pickPositionSupported
+    ? viewer.scene.pickPosition(position)
+    : viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
 }
 
-function registerEvents() {
-  elements.playToggle.addEventListener("click", () => {
-    viewer.clock.shouldAnimate = true;
-  });
-  elements.pauseToggle.addEventListener("click", () => {
-    viewer.clock.shouldAnimate = false;
-  });
-  elements.resetToggle.addEventListener("click", () => {
-    viewer.clock.shouldAnimate = false;
-    jumpToMinute(0);
-    viewer.camera.flyTo({ destination: homeView, duration: 1.2 });
-  });
-  elements.timelineSlider.addEventListener("input", event => {
-    viewer.clock.shouldAnimate = false;
-    jumpToMinute(Number(event.target.value));
-  });
-  elements.replaySpeed.addEventListener("input", event => {
-    state.replaySpeed = Number(event.target.value);
-    viewer.clock.multiplier = 60 * state.replaySpeed;
-    elements.replaySpeedValue.textContent = `${state.replaySpeed}×`;
-  });
-  elements.fxIntensity.addEventListener("input", event => {
-    state.fxIntensity = Number(event.target.value);
-    applyFxIntensity();
-  });
-  elements.fxGlow.addEventListener("input", event => {
-    state.fxGlow = Number(event.target.value);
-    applyGlow();
-  });
-  elements.saveBookmark.addEventListener("click", saveCurrentBookmark);
-  elements.clearBookmarks.addEventListener("click", () => {
-    state.bookmarks = [];
-    saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
-    renderBookmarks();
-  });
-  elements.refreshFeeds.addEventListener("click", () => {
-    refreshLiveFeeds();
-  });
-  elements.saveAisEndpoint.addEventListener("click", () => {
-    const endpoint = elements.aisEndpoint.value.trim();
-    setConfiguredAisEndpoint(endpoint);
-    elements.feedHint.textContent = endpoint
-      ? "AIS endpoint saved. Click Test or Refresh Feeds."
-      : "AIS endpoint cleared.";
-    refreshLiveFeeds();
-  });
-  elements.clearAisEndpoint.addEventListener("click", () => {
-    elements.aisEndpoint.value = "";
-    setConfiguredAisEndpoint("");
-    elements.feedHint.textContent = "AIS endpoint cleared.";
-    refreshLiveFeeds();
-  });
-  elements.testAisEndpoint.addEventListener("click", testAisEndpoint);
-  elements.btnDeclutter.addEventListener("click", () => {
-    state.declutter = !state.declutter;
-    applyDeclutterMode();
-  });
-  elements.btnDensity.addEventListener("click", () => {
-    state.compact = !state.compact;
-    applyDensityMode();
-  });
-  elements.closeIntelSheet.addEventListener("click", closeIntelSheet);
-  elements.mobileBackdrop.addEventListener("click", () => {
-    setMobileDrawer(null);
-    closeIntelSheet();
-  });
-  elements.btnMobileLayers.addEventListener("click", () => setMobileDrawer("layers"));
-  elements.btnMobileControls.addEventListener("click", () => setMobileDrawer("controls"));
-  elements.btnMobileIntel.addEventListener("click", () => {
-    if (!state.selectedEntity) {
-      return;
-    }
-    openIntelSheet(state.selectedEntity);
-  });
-  elements.trackSelected.addEventListener("click", () => {
-    if (state.selectedEntity) {
-      viewer.trackedEntity = state.selectedEntity;
-      state.trackedEntity = state.selectedEntity;
-      updateTrackButtons();
-    }
-  });
-  elements.releaseTrack.addEventListener("click", () => {
-    viewer.trackedEntity = undefined;
-    state.trackedEntity = null;
-    updateTrackButtons();
-  });
-  elements.searchButton.addEventListener("click", () => runSearch(elements.searchInput.value));
-  elements.searchInput.addEventListener("keydown", event => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      runSearch(elements.searchInput.value);
-    }
-  });
-  elements.btnHome.addEventListener("click", () => {
-    viewer.camera.flyTo({ destination: homeView, duration: 1.6 });
-  });
-  elements.btnTilt.addEventListener("click", () => {
-    state.tiltMode = !state.tiltMode;
-    elements.btnTilt.classList.toggle("active", state.tiltMode);
-    viewer.camera.flyTo({
-      destination: viewer.camera.positionWC,
-      orientation: {
-        heading: viewer.camera.heading,
-        pitch: state.tiltMode ? Cesium.Math.toRadians(-38) : Cesium.Math.toRadians(-90),
-        roll: 0
-      },
-      duration: 0.8
-    });
-  });
-  elements.btnSpin.addEventListener("click", () => {
-    state.spinning = !state.spinning;
-    elements.btnSpin.classList.toggle("active", state.spinning);
-  });
-
-  viewer.clock.onTick.addEventListener(clock => {
-    if (state.spinning && performance.now() >= state.spinPausedUntil && !state.trackedEntity) {
-      viewer.scene.camera.rotate(Cesium.Cartesian3.UNIT_Z, Cesium.Math.toRadians(0.06));
-    }
-    updateScene(clock.currentTime);
-  });
-
-  viewer.scene.postRender.addEventListener(() => {
-    const camera = viewer.camera;
-    const cartographic = Cesium.Cartographic.fromCartesian(camera.positionWC);
-    if (cartographic) {
-      elements.hudCamera.textContent = `ALT ${(cartographic.height / 1000).toFixed(0)} km · HEADING ${Cesium.Math.toDegrees(camera.heading).toFixed(0)}°`;
-    }
-  });
-
-  const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-  handler.setInputAction(click => {
-    const picked = viewer.scene.pick(click.position);
-    pausePassiveSpin(5500);
-    const cartesian = clickedCartesian(click.position, picked);
-    focusCameraOnCartesian(cartesian);
-    if (Cesium.defined(picked) && picked.id) {
-      state.selectedEntity = picked.id;
-      updateSelectedEntityCard(picked.id);
-      showHoverTooltip(picked.id, click.position);
-      openIntelSheet(picked.id);
-      setMobileDrawer(null);
-    } else {
-      state.selectedEntity = null;
-      updateSelectedEntityCard(null);
-      hideHoverTooltip();
-    }
-  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-  handler.setInputAction(() => {
-    pausePassiveSpin(6500);
-  }, Cesium.ScreenSpaceEventType.LEFT_DOWN);
-
-  handler.setInputAction(() => {
-    pausePassiveSpin(6500);
-  }, Cesium.ScreenSpaceEventType.WHEEL);
-
-  handler.setInputAction(movement => {
-    const picked = viewer.scene.pick(movement.endPosition);
-    if (Cesium.defined(picked) && picked.id) {
-      state.hoveredEntity = picked.id;
-      showHoverTooltip(picked.id, movement.endPosition);
-    } else {
-      state.hoveredEntity = null;
-      hideHoverTooltip();
-    }
-  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
-
-  window.addEventListener("resize", () => {
-    viewer.resize();
-    if (window.innerWidth > 980) {
-      setMobileDrawer(null);
-    }
-  });
-
-  window.addEventListener("keydown", event => {
-    const target = event.target;
-    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
-      return;
-    }
-    if (event.key === "/") {
-      event.preventDefault();
-      elements.searchInput.focus();
-      elements.searchInput.select();
-      return;
-    }
-    if (event.key.toLowerCase() === "f") {
-      state.declutter = !state.declutter;
-      applyDeclutterMode();
-      return;
-    }
-    if (event.key.toLowerCase() === "d") {
-      state.compact = !state.compact;
-      applyDensityMode();
-      return;
-    }
-    if (event.key.toLowerCase() === "l") {
-      setMobileDrawer(window.innerWidth <= 980 ? "layers" : null);
-      return;
-    }
-    if (event.key.toLowerCase() === "c") {
-      setMobileDrawer(window.innerWidth <= 980 ? "controls" : null);
-      return;
-    }
-    if (event.key.toLowerCase() === "i") {
-      if (state.selectedEntity) {
-        openIntelSheet(state.selectedEntity);
-      }
-      return;
-    }
-    if (event.key === "Escape") {
-      closeIntelSheet();
-      elements.searchResults.classList.add("hidden");
-    }
-  });
+function getEntityInfo(entity) {
+  if (!entity) return null;
+  const props       = entity.properties;
+  const label       = props?.label?.getValue?.(viewer.clock.currentTime)       ?? entity.id;
+  const description = props?.description?.getValue?.(viewer.clock.currentTime) ?? "";
+  const type        = props?.entityType?.getValue?.(viewer.clock.currentTime)  ?? "unknown";
+  const position    = entity.position?.getValue?.(viewer.clock.currentTime);
+  let locationMeta  = "Static overlay";
+  if (position) {
+    const cg = Cesium.Cartographic.fromCartesian(position);
+    locationMeta = `${Cesium.Math.toDegrees(cg.latitude).toFixed(2)}\u00b0, ${Cesium.Math.toDegrees(cg.longitude).toFixed(2)}\u00b0`;
+  }
+  const altitude  = props?.altitude?.getValue?.(viewer.clock.currentTime) ?? 0;
+  const synthetic = !!props?.synthetic?.getValue?.(viewer.clock.currentTime);
+  return { label, description, type, locationMeta, altitude, synthetic };
 }
 
-function updateScene(currentTime) {
-  const minute = currentMinute(currentTime);
-  elements.timelineSlider.value = String(Math.round(minute));
-  elements.summaryTime.textContent = formatMinute(minute);
-  const activeEvent = latestEvent(minute);
-  elements.summaryStage.textContent = activeEvent.title;
-  elements.summaryCopy.textContent = activeEvent.summary;
-  renderSummaryTags(activeEvent.tags);
-  updateTimelineMarkers(minute);
-  updateEventRail(minute);
-  updateZones(minute);
-  updateIncidents(minute);
-  updateLiveMetrics(minute);
-  updateFps();
-  updateAmbientEffects();
-  updateSelectedEntityCard(state.selectedEntity);
-}
+function hideHoverTooltip() { elements.hoverTooltip.classList.add("hidden"); }
 
-function latestEvent(minute) {
-  return SCENARIO.events.reduce((current, event) => (event.minute <= minute ? event : current), SCENARIO.events[0]);
-}
-
-function renderSummaryTags(tags = []) {
-  const activeLayers = LAYERS.filter(layer => state.layers[layer.id]).map(layer => layer.label);
-  const allTags = [...tags, ...activeLayers.slice(0, 3)];
-  elements.summaryTags.innerHTML = allTags.map(tag => `<span class="summary-tag">${tag}</span>`).join("");
-}
-
-function updateTimelineMarkers(minute) {
-  const markers = [...elements.timelineMarkers.children];
-  markers.forEach((marker, index) => {
-    marker.classList.toggle("active", SCENARIO.events[index].minute <= minute);
-  });
-}
-
-function updateEventRail(minute) {
-  [...elements.eventRail.children].forEach((item, index) => {
-    item.classList.toggle("active", latestEvent(minute).id === SCENARIO.events[index].id);
-  });
-}
-
-function updateZones(minute) {
-  dynamic.zones.forEach(({ entity, zone }) => {
-    entity.show = !!state.layers.zones && minute >= zone.start && minute <= zone.end;
-  });
-}
-
-function updateIncidents(minute) {
-  dynamic.incidents.forEach(({ entity, incident }) => {
-    entity.show = !!state.layers.incidents && minute >= incident.start && minute <= incident.end;
-  });
-  dynamic.rings.forEach(({ entity, incident }) => {
-    entity.show = !!state.layers.incidents && minute >= incident.start && minute <= incident.end;
-  });
-  dynamic.traffic.forEach(entity => {
-    const layerId = entity.properties.layerId.getValue();
-    entity.show = !!state.layers[layerId];
-  });
+function showHoverTooltip(entity, screenPosition) {
+  const info = getEntityInfo(entity);
+  if (!info) { hideHoverTooltip(); return; }
+  elements.hoverTooltip.innerHTML = `
+    <strong>${info.label}</strong>
+    <span>${info.type.toUpperCase()}</span>
+    <p>${info.description || info.locationMeta}</p>
+  `;
+  elements.hoverTooltip.style.left = `${screenPosition.x + 18}px`;
+  elements.hoverTooltip.style.top  = `${screenPosition.y + 18}px`;
+  elements.hoverTooltip.classList.remove("hidden");
 }
 
 function updateSelectedEntityCard(entity) {
@@ -1278,7 +912,7 @@ function updateSelectedEntityCard(entity) {
     <div class="entity-stats">
       <span>ALT ${Math.round(altitude).toLocaleString()} m</span>
       <span>${synthetic ? "AUX MODEL" : "PRIMARY TRACK"}</span>
-      <span>${viewer.clock.shouldAnimate ? "REPLAY RUNNING" : "REPLAY PAUSED"}</span>
+      <span>LIVE</span>
     </div>
   `;
   elements.entityInfo.onclick = () => openIntelSheet(entity);
@@ -1288,21 +922,21 @@ function updateSelectedEntityCard(entity) {
 function updateTrackButtons() {
   const canTrack = !!state.selectedEntity && !!state.selectedEntity.position;
   elements.trackSelected.disabled = !canTrack;
-  elements.releaseTrack.disabled = !state.trackedEntity;
+  elements.releaseTrack.disabled  = !state.trackedEntity;
 }
 
 function saveCurrentBookmark() {
-  const cartographic = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+  const cg = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
   const next = {
-    id: `bookmark-${Date.now()}`,
+    id:    `bookmark-${Date.now()}`,
     label: `View ${state.bookmarks.length + 1}`,
     destination: {
-      lng: Cesium.Math.toDegrees(cartographic.longitude),
-      lat: Cesium.Math.toDegrees(cartographic.latitude),
-      height: cartographic.height,
+      lng:     Cesium.Math.toDegrees(cg.longitude),
+      lat:     Cesium.Math.toDegrees(cg.latitude),
+      height:  cg.height,
       heading: viewer.camera.heading,
-      pitch: viewer.camera.pitch,
-      roll: viewer.camera.roll
+      pitch:   viewer.camera.pitch,
+      roll:    viewer.camera.roll
     }
   };
   state.bookmarks = [...state.bookmarks, next].slice(-8);
@@ -1310,115 +944,261 @@ function saveCurrentBookmark() {
   renderBookmarks();
 }
 
-function removeBookmark(bookmarkId) {
-  state.bookmarks = state.bookmarks.filter(bookmark => bookmark.id !== bookmarkId);
+function removeBookmark(id) {
+  state.bookmarks = state.bookmarks.filter(b => b.id !== id);
   saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
   renderBookmarks();
 }
 
 function flyToBookmark(bookmark) {
   viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(bookmark.destination.lng, bookmark.destination.lat, bookmark.destination.height),
+    destination: Cesium.Cartesian3.fromDegrees(
+      bookmark.destination.lng, bookmark.destination.lat, bookmark.destination.height
+    ),
     orientation: {
       heading: bookmark.destination.heading,
-      pitch: bookmark.destination.pitch,
-      roll: bookmark.destination.roll
+      pitch:   bookmark.destination.pitch,
+      roll:    bookmark.destination.roll
     },
     duration: 1.2
   });
 }
 
+function installBasemap(basemapId) {
+  state.basemapId = basemapId;
+  saveJson(STORAGE_KEYS.basemap, basemapId);
+  viewer.imageryLayers.removeAll();
+  const bm = BASEMAPS.find(b => b.id === basemapId) || BASEMAPS[0];
+  const provider = bm.type === "osm"
+    ? new Cesium.OpenStreetMapImageryProvider({ url: bm.url })
+    : new Cesium.UrlTemplateImageryProvider({ url: bm.url, credit: bm.credit });
+  viewer.imageryLayers.addImageryProvider(provider);
+  renderBasemapButtons();
+}
+
 function applyFxMode(mode) {
   document.body.dataset.fxMode = mode;
-  postStages.blackAndWhite.enabled = mode === "nightvision" || mode === "thermal";
+  postStages.blackAndWhite.enabled             = mode === "nightvision" || mode === "thermal";
   postStages.blackAndWhite.uniforms.gradations = mode === "thermal" ? 8 : 14;
-  postStages.brightness.enabled = mode !== "normal";
-  postStages.brightness.uniforms.brightness = mode === "nightvision" ? 0.08 : mode === "thermal" ? 0.15 : mode === "crt" ? 0.05 : 0;
+  postStages.brightness.enabled                = mode !== "normal";
+  postStages.brightness.uniforms.brightness    = mode === "nightvision" ? 0.08 : mode === "thermal" ? 0.15 : mode === "crt" ? 0.05 : 0;
 }
 
 function applyFxIntensity() {
-  elements.fxIntensityValue.textContent = String(state.fxIntensity);
+  if (elements.fxIntensityValue) elements.fxIntensityValue.textContent = String(state.fxIntensity);
   document.documentElement.style.setProperty("--fx-intensity", String(state.fxIntensity / 100));
 }
 
 function applyGlow() {
-  elements.fxGlowValue.textContent = String(state.fxGlow);
-  if (!bloomStage) {
-    return;
-  }
-  bloomStage.uniforms.glowOnly = false;
-  bloomStage.uniforms.contrast = 128 - state.fxGlow * 0.4;
+  if (elements.fxGlowValue) elements.fxGlowValue.textContent = String(state.fxGlow);
+  if (!bloomStage) return;
+  bloomStage.uniforms.glowOnly   = false;
+  bloomStage.uniforms.contrast   = 128 - state.fxGlow * 0.4;
   bloomStage.uniforms.brightness = -0.15 + state.fxGlow / 300;
-  bloomStage.uniforms.delta = 1 + state.fxGlow / 60;
-  bloomStage.uniforms.sigma = 2 + state.fxGlow / 24;
-  bloomStage.uniforms.stepSize = 3 + state.fxGlow / 35;
-}
-
-function jumpToMinute(minute) {
-  viewer.clock.currentTime = minuteToTime(clamp(minute, 0, SCENARIO.durationMinutes));
-  updateScene(viewer.clock.currentTime);
-  viewer.scene.requestRender();
-}
-
-async function runSearch(query) {
-  const trimmed = query.trim();
-  if (!trimmed) {
-    elements.searchResults.classList.add("hidden");
-    return;
-  }
-  if (state.searchAbortController) {
-    state.searchAbortController.abort();
-  }
-  state.searchAbortController = new AbortController();
-  try {
-    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmed)}`, {
-      signal: state.searchAbortController.signal,
-      headers: {
-        Accept: "application/json"
-      }
-    });
-    const results = await response.json();
-    renderSearchResults(results);
-  } catch {
-    elements.searchResults.classList.add("hidden");
-  }
-}
-
-function renderSearchResults(results) {
-  if (!results.length) {
-    elements.searchResults.classList.add("hidden");
-    return;
-  }
-  elements.searchResults.innerHTML = "";
-  results.forEach(result => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "search-result";
-    button.innerHTML = `<strong>${result.display_name.split(",")[0]}</strong><span>${result.display_name}</span>`;
-    button.addEventListener("click", () => {
-      elements.searchResults.classList.add("hidden");
-      elements.searchInput.value = result.display_name;
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(Number(result.lon), Number(result.lat), 1800000),
-        duration: 1.6
-      });
-    });
-    elements.searchResults.appendChild(button);
-  });
-  elements.searchResults.classList.remove("hidden");
+  bloomStage.uniforms.delta      = 1 + state.fxGlow / 60;
+  bloomStage.uniforms.sigma      = 2 + state.fxGlow / 24;
+  bloomStage.uniforms.stepSize   = 3 + state.fxGlow / 35;
 }
 
 function startHudClock() {
   window.setInterval(() => {
     const now = new Date();
-    elements.hudUtc.textContent = `UTC ${now.toUTCString().slice(17, 25)}`;
-    elements.hudLocal.textContent = `LOCAL ${now.toLocaleTimeString([], { hour12: false })}`;
+    if (elements.hudUtc)      elements.hudUtc.textContent      = `UTC ${now.toUTCString().slice(17, 25)}`;
+    if (elements.hudLocal)    elements.hudLocal.textContent    = `LOCAL ${now.toLocaleTimeString([], { hour12: false })}`;
+    if (elements.summaryTime) elements.summaryTime.textContent = `${now.toUTCString().slice(17, 25)} UTC`;
   }, 250);
 }
 
 function updateFps() {
   const now = performance.now();
   frameSamples.push(now);
-  frameSamples = frameSamples.filter(sample => now - sample < 1000);
-  elements.hudFps.textContent = `${frameSamples.length} FPS`;
+  frameSamples = frameSamples.filter(s => now - s < 1000);
+  if (elements.hudFps) elements.hudFps.textContent = `${frameSamples.length} FPS`;
+}
+
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+
+async function runSearch(query) {
+  const trimmed = query.trim();
+  if (!trimmed) { elements.searchResults.classList.add("hidden"); return; }
+  if (state.searchAbortController) state.searchAbortController.abort();
+  state.searchAbortController = new AbortController();
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(trimmed)}`,
+      { signal: state.searchAbortController.signal, headers: { Accept: "application/json" } }
+    );
+    renderSearchResults(await response.json());
+  } catch {
+    elements.searchResults.classList.add("hidden");
+  }
+}
+
+function renderSearchResults(results) {
+  if (!results.length) { elements.searchResults.classList.add("hidden"); return; }
+  elements.searchResults.innerHTML = "";
+  results.forEach(r => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "search-result";
+    btn.innerHTML = `<strong>${r.display_name.split(",")[0]}</strong><span>${r.display_name}</span>`;
+    btn.addEventListener("click", () => {
+      elements.searchResults.classList.add("hidden");
+      elements.searchInput.value = r.display_name;
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(Number(r.lon), Number(r.lat), 1800000),
+        duration: 1.6
+      });
+    });
+    elements.searchResults.appendChild(btn);
+  });
+  elements.searchResults.classList.remove("hidden");
+}
+
+function registerEvents() {
+  if (elements.refreshInterval) {
+    elements.refreshInterval.addEventListener("input", event => {
+      state.refreshIntervalSec = Number(event.target.value);
+      if (elements.refreshIntervalVal) elements.refreshIntervalVal.textContent = `${state.refreshIntervalSec}s`;
+      scheduleRefresh();
+    });
+  }
+
+  elements.fxIntensity.addEventListener("input", event => {
+    state.fxIntensity = Number(event.target.value);
+    applyFxIntensity();
+  });
+  elements.fxGlow.addEventListener("input", event => {
+    state.fxGlow = Number(event.target.value);
+    applyGlow();
+  });
+
+  elements.saveBookmark.addEventListener("click",  saveCurrentBookmark);
+  elements.clearBookmarks.addEventListener("click", () => {
+    state.bookmarks = [];
+    saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
+    renderBookmarks();
+  });
+
+  elements.refreshFeeds?.addEventListener("click",       () => refreshLiveFeeds());
+  elements.saveAisEndpoint?.addEventListener("click",    () => {
+    const endpoint = elements.aisEndpoint.value.trim();
+    setConfiguredAisEndpoint(endpoint);
+    if (elements.feedHint) elements.feedHint.textContent = endpoint ? "AIS endpoint saved. Refreshing\u2026" : "AIS endpoint cleared.";
+    refreshLiveFeeds();
+  });
+  elements.clearAisEndpoint?.addEventListener("click",   () => {
+    elements.aisEndpoint.value = "";
+    setConfiguredAisEndpoint("");
+    if (elements.feedHint) elements.feedHint.textContent = "AIS endpoint cleared.";
+    refreshLiveFeeds();
+  });
+  elements.testAisEndpoint?.addEventListener("click",    testAisEndpoint);
+  elements.refreshNow?.addEventListener("click",         () => refreshLiveFeeds());
+  elements.btnFullscreen?.addEventListener("click",      () => {
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  });
+
+  elements.btnDeclutter?.addEventListener("click",       () => { state.declutter = !state.declutter; applyDeclutterMode(); });
+  elements.btnDensity?.addEventListener("click",         () => { state.compact   = !state.compact;   applyDensityMode();   });
+  elements.closeIntelSheet?.addEventListener("click",    closeIntelSheet);
+  elements.mobileBackdrop?.addEventListener("click",     () => { setMobileDrawer(null); closeIntelSheet(); });
+  elements.btnMobileLayers?.addEventListener("click",    () => setMobileDrawer("layers"));
+  elements.btnMobileControls?.addEventListener("click",  () => setMobileDrawer("controls"));
+  elements.btnMobileIntel?.addEventListener("click",     () => { if (state.selectedEntity) openIntelSheet(state.selectedEntity); });
+  elements.trackSelected?.addEventListener("click",      () => {
+    if (state.selectedEntity) {
+      viewer.trackedEntity = state.selectedEntity;
+      state.trackedEntity  = state.selectedEntity;
+      updateTrackButtons();
+    }
+  });
+  elements.releaseTrack?.addEventListener("click",       () => {
+    viewer.trackedEntity = undefined;
+    state.trackedEntity  = null;
+    updateTrackButtons();
+  });
+
+  elements.searchButton?.addEventListener("click",  () => runSearch(elements.searchInput.value));
+  elements.searchInput?.addEventListener("keydown", event => {
+    if (event.key === "Enter") { event.preventDefault(); runSearch(elements.searchInput.value); }
+  });
+
+  elements.btnHome?.addEventListener("click",  () => viewer.camera.flyTo({ destination: homeView, duration: 1.6 }));
+  elements.btnTilt?.addEventListener("click",  () => {
+    state.tiltMode = !state.tiltMode;
+    elements.btnTilt.classList.toggle("active", state.tiltMode);
+    viewer.camera.flyTo({
+      destination: viewer.camera.positionWC,
+      orientation: {
+        heading: viewer.camera.heading,
+        pitch:   state.tiltMode ? Cesium.Math.toRadians(-38) : Cesium.Math.toRadians(-90),
+        roll:    0
+      },
+      duration: 0.8
+    });
+  });
+  elements.btnSpin?.addEventListener("click",  () => {
+    state.spinning = !state.spinning;
+    elements.btnSpin.classList.toggle("active", state.spinning);
+  });
+
+  viewer.scene.postRender.addEventListener(() => {
+    const cg = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+    if (cg && elements.hudCamera) {
+      elements.hudCamera.textContent = `ALT ${(cg.height / 1000).toFixed(0)} km \u00b7 HEADING ${Cesium.Math.toDegrees(viewer.camera.heading).toFixed(0)}\u00b0`;
+    }
+  });
+
+  const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  handler.setInputAction(click => {
+    const picked    = viewer.scene.pick(click.position);
+    pausePassiveSpin(5500);
+    const cartesian = clickedCartesian(click.position, picked);
+    focusCameraOnCartesian(cartesian);
+    if (Cesium.defined(picked) && picked.id) {
+      state.selectedEntity = picked.id;
+      updateSelectedEntityCard(picked.id);
+      showHoverTooltip(picked.id, click.position);
+      openIntelSheet(picked.id);
+      setMobileDrawer(null);
+    } else {
+      state.selectedEntity = null;
+      updateSelectedEntityCard(null);
+      hideHoverTooltip();
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  handler.setInputAction(() => pausePassiveSpin(6500), Cesium.ScreenSpaceEventType.LEFT_DOWN);
+  handler.setInputAction(() => pausePassiveSpin(6500), Cesium.ScreenSpaceEventType.WHEEL);
+
+  handler.setInputAction(movement => {
+    const picked = viewer.scene.pick(movement.endPosition);
+    if (Cesium.defined(picked) && picked.id) {
+      state.hoveredEntity = picked.id;
+      showHoverTooltip(picked.id, movement.endPosition);
+    } else {
+      state.hoveredEntity = null;
+      hideHoverTooltip();
+    }
+  }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+  window.addEventListener("resize", () => {
+    viewer.resize();
+    if (window.innerWidth > 980) setMobileDrawer(null);
+  });
+
+  window.addEventListener("keydown", event => {
+    const target = event.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+    if (event.key === "/")                { event.preventDefault(); elements.searchInput.focus(); elements.searchInput.select(); return; }
+    if (event.key.toLowerCase() === "f") { state.declutter = !state.declutter; applyDeclutterMode(); return; }
+    if (event.key.toLowerCase() === "d") { state.compact   = !state.compact;   applyDensityMode();   return; }
+    if (event.key.toLowerCase() === "r") { refreshLiveFeeds(); return; }
+    if (event.key.toLowerCase() === "l") { setMobileDrawer(window.innerWidth <= 980 ? "layers"   : null); return; }
+    if (event.key.toLowerCase() === "c") { setMobileDrawer(window.innerWidth <= 980 ? "controls" : null); return; }
+    if (event.key.toLowerCase() === "i") { if (state.selectedEntity) openIntelSheet(state.selectedEntity); return; }
+    if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); }
+  });
 }

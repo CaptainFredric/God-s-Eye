@@ -82,70 +82,54 @@ export const SCENARIO = {
     pitch: -1.2,
     roll: 0
   },
-  events: [
+  alerts: [
     {
-      id: "baseline",
-      minute: 0,
-      title: "Global baseline",
-      summary: "Civil air traffic, maritime routes, and orbital passes are active at startup.",
-      tags: ["air", "maritime", "orbit"],
-      location: { lng: 26.4, lat: 35.1 }
-    },
-    {
-      id: "gulf-jamming",
-      minute: 16,
-      title: "Gulf jamming increase",
-      summary: "Disruption zones expand in the Gulf corridor and trigger early reroutes.",
+      id: "alert-gulf",
+      region: "GULF",
+      title: "Gulf GPS Disruption Active",
+      summary: "Persistent GPS jamming in the Gulf corridor affecting commercial and military aviation.",
       tags: ["jamming", "gulf", "aviation"],
       location: { lng: 53.8, lat: 29.9 }
     },
     {
-      id: "orbital-focus",
-      minute: 28,
-      title: "Orbital focus",
-      summary: "Imaging platforms align over key hotspots across the Gulf and Levant.",
+      id: "alert-orbital",
+      region: "ORBIT",
+      title: "Imaging Satellites Over AOI",
+      summary: "Multiple EO and SAR platforms are currently crossing the Middle East area of interest.",
       tags: ["satellite", "aoi", "imagery"],
       location: { lng: 54.1, lat: 33.5 }
     },
     {
-      id: "corridor-bend",
-      minute: 41,
-      title: "Civil routes adjust",
-      summary: "Airliners and cargo routes shift away from the most disrupted corridors.",
+      id: "alert-routes",
+      region: "CIVIL AIR",
+      title: "Rerouting In Progress",
+      summary: "Commercial routes are diverting around the most congested and disrupted corridors.",
       tags: ["commercial", "reroute"],
       location: { lng: 49.8, lat: 27.2 }
     },
     {
-      id: "zero-hour",
-      minute: 56,
-      title: "Primary event window",
-      summary: "Activity intensifies across the AOI while support aircraft and satellites reposition.",
-      tags: ["strike", "aoi", "military"],
-      location: { lng: 53.9, lat: 33.1 }
-    },
-    {
-      id: "closure-wave",
-      minute: 73,
-      title: "Regional closure spread",
-      summary: "Airspace and chokepoint closures expand west and south, changing route behavior.",
+      id: "alert-closures",
+      region: "AIRSPACE",
+      title: "Regional Closures Extended",
+      summary: "Airspace closure zones have expanded west and south; chokepoint restrictions ongoing.",
       tags: ["closure", "cascade", "shipping"],
       location: { lng: 46.1, lat: 28.8 }
     },
     {
-      id: "pacific-alert",
-      minute: 88,
-      title: "Pacific alert",
-      summary: "Military aviation and orbital monitoring increase over the western Pacific.",
+      id: "alert-pacific",
+      region: "PACIFIC",
+      title: "Pacific Posture Elevated",
+      summary: "Military aviation and ISR monitoring activity increased over the western Pacific.",
       tags: ["pacific", "military", "orbit"],
       location: { lng: 139.2, lat: 29.6 }
     },
     {
-      id: "global-afterglow",
-      minute: 120,
-      title: "Global stabilization",
-      summary: "Traffic begins to normalize while satellite monitoring remains elevated.",
-      tags: ["aftermath", "global"],
-      location: { lng: 11.4, lat: 46.2 }
+      id: "alert-comms",
+      region: "SIGNAL",
+      title: "Comms Blackout — Theater Core",
+      summary: "Ground reporting remains suppressed across the theater core region.",
+      tags: ["signals", "blackout"],
+      location: { lng: 51.4, lat: 35.6 }
     }
   ],
   flights: {
@@ -413,25 +397,19 @@ export const SCENARIO = {
     {
       id: "incident-aoi",
       label: "AOI Strike",
-      description: "Primary zero-hour event window.",
-      start: 54,
-      end: 73,
+      description: "Primary event window — elevated activity in this sector.",
       location: { lng: 53.9, lat: 33.1 }
     },
     {
       id: "incident-blackout",
       label: "Comms Blackout",
-      description: "Ground reporting collapse in the theater core.",
-      start: 61,
-      end: 90,
+      description: "Ground reporting suppressed in the theater core.",
       location: { lng: 51.4, lat: 35.6 }
     },
     {
       id: "incident-pacific",
       label: "Pacific Alert",
-      description: "Posture increase around the western Pacific watch area.",
-      start: 88,
-      end: 120,
+      description: "Elevated posture across the western Pacific watch area.",
       location: { lng: 139.4, lat: 28.7 }
     }
   ],
@@ -440,8 +418,6 @@ export const SCENARIO = {
       id: "zone-gulf-jam",
       label: "Gulf GPS Disruption",
       kind: "rectangle",
-      start: 16,
-      end: 92,
       color: "#ff6d8d",
       fill: 0.16,
       coordinates: { west: 49.1, south: 28.2, east: 55.6, north: 33.8 }
@@ -450,8 +426,6 @@ export const SCENARIO = {
       id: "zone-gulf-closure",
       label: "Regional Closure Wave",
       kind: "polygon",
-      start: 73,
-      end: 120,
       color: "#ffffff",
       fill: 0.08,
       coordinates: [
@@ -465,8 +439,6 @@ export const SCENARIO = {
       id: "zone-pacific-watch",
       label: "Pacific Watch Box",
       kind: "rectangle",
-      start: 88,
-      end: 120,
       color: "#7ee0ff",
       fill: 0.08,
       coordinates: { west: 133.5, south: 24.4, east: 147.8, north: 33.6 }
