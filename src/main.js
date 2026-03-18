@@ -1,5 +1,6 @@
 import { BASEMAPS, DEFAULT_BOOKMARKS, FX_MODES, LAYERS, SCENARIO, STORAGE_KEYS } from "./data/scenario.js";
 import { fetchLiveFeeds, fetchAisFeed, getConfiguredAisEndpoint, setConfiguredAisEndpoint } from "./services/live-feeds.js";
+import { NEWS_CATEGORIES, fetchNewsCategory, fetchAllNewsCategories, invalidateNewsCache } from "./services/news-feeds.js";
 
 const Cesium = await loadCesium();
 
@@ -38,6 +39,11 @@ const state = {
   alertNarrativeIndexes: Object.create(null),
   incidentNarrativeIndexes: Object.create(null),
   narrativeTimer:        null,
+  newsOpen:              false,
+  newsCategory:          "war",
+  newsArticles:          [],
+  newsLastFetched:       null,
+  newsRefreshTimer:      null,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -144,6 +150,7 @@ renderEventRail();
 startNarrativeTicker();
 scheduleRefresh();
 refreshLiveFeeds();
+initNewsPanel();
 viewer.scene.requestRender();
 
 function initializeNarrativeState() {
@@ -286,7 +293,15 @@ function cacheElements() {
     btnDensity:          document.getElementById("btn-density"),
     btnHome:             document.getElementById("btn-home"),
     btnTilt:             document.getElementById("btn-tilt"),
-    btnSpin:             document.getElementById("btn-spin")
+    btnSpin:             document.getElementById("btn-spin"),
+    newsBriefing:        document.getElementById("news-briefing"),
+    newsCards:           document.getElementById("news-cards"),
+    newsCatNav:          document.getElementById("news-cat-nav"),
+    newsUpdated:         document.getElementById("news-updated"),
+    newsRefreshBtn:      document.getElementById("news-refresh"),
+    newsCloseBtn:        document.getElementById("news-close"),
+    newsToggleBtn:       document.getElementById("btn-news-toggle"),
+    newsBadge:           document.getElementById("news-badge")
   });
 
   if (elements.fxIntensity)    elements.fxIntensity.value   = String(state.fxIntensity);
@@ -1859,6 +1874,247 @@ function registerEvents() {
     if (event.key.toLowerCase() === "l") { setMobileDrawer(window.innerWidth <= 980 ? "layers"   : null); return; }
     if (event.key.toLowerCase() === "c") { setMobileDrawer(window.innerWidth <= 980 ? "controls" : null); return; }
     if (event.key.toLowerCase() === "i") { if (state.selectedEntity) openIntelSheet(state.selectedEntity); return; }
-    if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); }
+    if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); closeNewsPanel(); }
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIVE NEWS MODULE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function initNewsPanel() {
+  // Build category pills
+  const nav = elements.newsCatNav;
+  if (!nav) return;
+  nav.innerHTML = "";
+  NEWS_CATEGORIES.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.className = "news-cat-pill";
+    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", cat.id === state.newsCategory ? "true" : "false");
+    btn.dataset.catId = cat.id;
+    btn.style.setProperty("--active-color", cat.color);
+    btn.innerHTML = `<span class="news-cat-icon">${cat.icon}</span>${cat.label}<span class="news-cat-count" id="news-count-${cat.id}">—</span>`;
+    btn.addEventListener("click", () => switchNewsCategory(cat.id));
+    nav.appendChild(btn);
+  });
+
+  // Wire header buttons
+  elements.newsToggleBtn?.addEventListener("click", toggleNewsPanel);
+  elements.newsCloseBtn?.addEventListener("click",  closeNewsPanel);
+  elements.newsRefreshBtn?.addEventListener("click", () => {
+    invalidateNewsCache();
+    loadNewsCategory(state.newsCategory, true);
+  });
+
+  // Auto-refresh every 90 seconds (matches main refresh cadence)
+  state.newsRefreshTimer = window.setInterval(() => {
+    invalidateNewsCache();
+    loadNewsCategory(state.newsCategory, false);
+  }, 90_000);
+
+  // Kick off initial fetch silently (panel starts closed)
+  prefetchAllCategories();
+}
+
+function toggleNewsPanel() {
+  if (state.newsOpen) {
+    closeNewsPanel();
+  } else {
+    openNewsPanel();
+  }
+}
+
+function openNewsPanel() {
+  state.newsOpen = true;
+  elements.newsBriefing?.classList.remove("hidden");
+  elements.newsToggleBtn?.classList.add("active");
+  hideBadge();
+  if (!state.newsArticles.length) {
+    loadNewsCategory(state.newsCategory, true);
+  } else {
+    renderNewsCards(state.newsArticles);
+  }
+}
+
+function closeNewsPanel() {
+  if (!state.newsOpen) return;
+  state.newsOpen = false;
+  elements.newsBriefing?.classList.add("hidden");
+  elements.newsToggleBtn?.classList.remove("active");
+}
+
+async function switchNewsCategory(catId) {
+  if (catId === state.newsCategory && state.newsArticles.length) {
+    // Just re-render; no re-fetch unless stale
+    renderNewsCards(state.newsArticles);
+    return;
+  }
+  state.newsCategory = catId;
+  updateCatPillSelection(catId);
+  renderNewsSkeletons();
+  await loadNewsCategory(catId, false);
+}
+
+function updateCatPillSelection(catId) {
+  const nav = elements.newsCatNav;
+  if (!nav) return;
+  nav.querySelectorAll(".news-cat-pill").forEach(pill => {
+    const isActive = pill.dataset.catId === catId;
+    pill.setAttribute("aria-selected", isActive ? "true" : "false");
+    const cat = NEWS_CATEGORIES.find(c => c.id === pill.dataset.catId);
+    if (cat) pill.style.setProperty("--active-color", cat.color);
+  });
+}
+
+async function loadNewsCategory(catId, forceRefresh) {
+  if (forceRefresh) {
+    invalidateNewsCache();
+    renderNewsSkeletons();
+    animateRefreshButton(true);
+  }
+  try {
+    const result = await fetchNewsCategory(catId);
+    if (catId !== state.newsCategory) return; // category switched mid-fetch
+    state.newsArticles  = result.articles ?? [];
+    state.newsLastFetched = result.fetchedAt ?? new Date();
+    setNewsUpdatedLabel(state.newsLastFetched);
+    renderNewsCards(state.newsArticles);
+    updateCategoryCount(catId, state.newsArticles.length);
+    updateBadge(state.newsArticles.length);
+  } catch (err) {
+    renderNewsError(`Fetch failed: ${err?.message ?? "Network error"}`);
+  } finally {
+    animateRefreshButton(false);
+  }
+}
+
+async function prefetchAllCategories() {
+  try {
+    const all = await fetchAllNewsCategories();
+    Object.entries(all).forEach(([catId, result]) => {
+      updateCategoryCount(catId, (result.articles ?? []).length);
+    });
+    // Seed default category
+    const defaultResult = all[state.newsCategory];
+    if (defaultResult?.articles?.length) {
+      state.newsArticles   = defaultResult.articles;
+      state.newsLastFetched = defaultResult.fetchedAt;
+      setNewsUpdatedLabel(state.newsLastFetched);
+      updateBadge(state.newsArticles.length);
+    }
+  } catch { /* silent — will load on open */ }
+}
+
+// ── Renderers ──────────────────────────────────────────────────────────────
+
+function renderNewsSkeletons() {
+  if (!elements.newsCards) return;
+  elements.newsCards.innerHTML = `
+    <div class="news-skeleton-list">
+      <div class="news-skeleton"></div>
+      <div class="news-skeleton"></div>
+      <div class="news-skeleton"></div>
+      <div class="news-skeleton"></div>
+      <div class="news-skeleton"></div>
+    </div>`;
+}
+
+function renderNewsError(message) {
+  if (!elements.newsCards) return;
+  elements.newsCards.innerHTML = `<div class="news-error">⚠ ${escHtml(message)}</div>`;
+}
+
+function renderNewsCards(articles) {
+  if (!elements.newsCards) return;
+  if (!articles.length) {
+    elements.newsCards.innerHTML = `<div class="news-empty">No articles found. Try another category or refresh.</div>`;
+    return;
+  }
+  const cat = NEWS_CATEGORIES.find(c => c.id === state.newsCategory) ?? NEWS_CATEGORIES[0];
+  const frag = document.createDocumentFragment();
+  articles.forEach((article, i) => {
+    const card = buildNewsCard(article, cat, i);
+    frag.appendChild(card);
+  });
+  elements.newsCards.innerHTML = "";
+  elements.newsCards.appendChild(frag);
+}
+
+function buildNewsCard(article, cat, index) {
+  const a = document.createElement("a");
+  a.className = "news-card";
+  a.href = article.url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.style.setProperty("--card-accent", cat.color);
+  a.style.animationDelay = `${index * 0.045}s`;
+  a.setAttribute("role", "listitem");
+
+  const thumbHtml = article.image
+    ? `<img class="news-card-thumb" src="${escAttr(article.image)}" alt="" loading="lazy"
+         onerror="this.style.display='none';this.parentElement.querySelector('.news-card-thumb-fallback').style.display='flex'">`
+    : "";
+  const fallbackHtml = `<span class="news-card-thumb-fallback" style="${article.image ? "display:none" : ""}">
+    ${escHtml(cat.icon)}</span>`;
+
+  a.innerHTML = `
+    <div class="news-card-thumb-wrap">
+      ${thumbHtml}${fallbackHtml}
+    </div>
+    <div class="news-card-body">
+      <div class="news-card-meta">
+        <span class="news-card-cat" style="background:${escAttr(cat.color)}">${escHtml(cat.label)}</span>
+        <span class="news-card-outlet">
+          <img class="news-outlet-favicon" src="${escAttr(article.favicon)}" alt="" loading="lazy"
+            onerror="this.style.display='none'">
+          <span class="news-outlet-domain">${escHtml(article.domain)}</span>
+        </span>
+      </div>
+      <div class="news-card-title">${escHtml(article.title)}</div>
+      <div class="news-card-time">${escHtml(article.relativeTime)}${article.country ? ` · ${escHtml(article.country)}` : ""}</div>
+    </div>`;
+  return a;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function setNewsUpdatedLabel(date) {
+  if (!elements.newsUpdated || !date) return;
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+  elements.newsUpdated.textContent = mins < 1 ? "Just now" : `${mins}m ago`;
+}
+
+function updateCategoryCount(catId, count) {
+  const el = document.getElementById(`news-count-${catId}`);
+  if (el) el.textContent = count > 0 ? String(count) : "—";
+}
+
+function updateBadge(count) {
+  if (!elements.newsBadge) return;
+  if (!state.newsOpen && count > 0) {
+    elements.newsBadge.textContent = count > 99 ? "99+" : String(count);
+    elements.newsBadge.classList.remove("hidden");
+  }
+}
+
+function hideBadge() {
+  elements.newsBadge?.classList.add("hidden");
+}
+
+function animateRefreshButton(spinning) {
+  if (!elements.newsRefreshBtn) return;
+  elements.newsRefreshBtn.classList.toggle("spinning", spinning);
+}
+
+function escHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escAttr(str) {
+  return String(str ?? "").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
 }

@@ -223,6 +223,47 @@
     </aside>
   </div>
 
+  <!-- ── Live News Briefing ─────────────────────────────────────────────── -->
+  <aside id="news-briefing" class="news-briefing glass-panel hidden" aria-label="Live News Briefing">
+    <div class="news-head">
+      <div class="news-head-left">
+        <span class="news-live-dot"></span>
+        <span class="news-title">LIVE INTELLIGENCE FEED</span>
+      </div>
+      <div class="news-head-right">
+        <span id="news-updated" class="news-updated-label">Fetching…</span>
+        <button id="news-refresh" class="news-icon-btn" type="button" title="Refresh now">↺</button>
+        <button id="news-close" class="news-icon-btn" type="button" title="Close">✕</button>
+      </div>
+    </div>
+
+    <nav class="news-cat-nav" id="news-cat-nav" role="tablist" aria-label="News categories">
+      <!-- category pills injected by JS -->
+    </nav>
+
+    <div id="news-cards" class="news-cards" role="list">
+      <div class="news-skeleton-list">
+        <div class="news-skeleton"></div>
+        <div class="news-skeleton"></div>
+        <div class="news-skeleton"></div>
+        <div class="news-skeleton"></div>
+        <div class="news-skeleton"></div>
+      </div>
+    </div>
+
+    <div class="news-footer">
+      <span class="news-powered">Powered by GDELT Project · Updated every 90 s</span>
+      <a class="news-gdelt-link" href="https://www.gdeltproject.org" target="_blank" rel="noopener noreferrer">gdeltproject.org ↗</a>
+    </div>
+  </aside>
+
+  <!-- News trigger button (fixed bottom-right of globe) -->
+  <button id="btn-news-toggle" class="news-toggle-btn" type="button" title="Live News Briefing">
+    <span class="news-toggle-icon">📡</span>
+    <span class="news-toggle-label">NEWS</span>
+    <span class="news-toggle-badge hidden" id="news-badge">0</span>
+  </button>
+
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
   <script type="module" src="./src/main.js"></script>
 </body>
