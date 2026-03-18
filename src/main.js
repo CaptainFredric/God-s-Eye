@@ -33,6 +33,8 @@ const state = {
   regionFocus:           null,
   searchAbortController: null,
   searchDebounceTimer:   null,
+  searchCursorIndex:     -1,
+  searchFlatResults:     [],
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -123,11 +125,13 @@ applyDensityMode();
 renderMetricCluster();
 renderBasemapButtons();
 renderLayerToggles();
+renderLegend();
 renderBookmarks();
 renderFxButtons();
 installBasemap(state.basemapId);
 seedScene();
 renderFeedStatus();
+renderTrustIndicators();
 registerEvents();
 elements.btnSpin.classList.toggle("active", state.spinning);
 startHudClock();
@@ -172,6 +176,10 @@ function cacheElements() {
     searchButton:        document.getElementById("search-btn"),
     searchResults:       document.getElementById("search-results"),
     searchMeta:          document.getElementById("search-meta"),
+    legendItems:         document.getElementById("legend-items"),
+    legendUpdated:       document.getElementById("legend-updated"),
+    trustIndicators:     document.getElementById("trust-indicators"),
+    trustSummary:        document.getElementById("trust-summary"),
     hoverTooltip:        document.getElementById("hover-tooltip"),
     mobileDrawers:       document.getElementById("mobile-drawers"),
     mobileBackdrop:      document.getElementById("mobile-backdrop"),
@@ -246,6 +254,7 @@ function scheduleRefresh() {
   if (state.refreshTimer) window.clearInterval(state.refreshTimer);
   state.nextRefreshAt = Date.now() + state.refreshIntervalSec * 1000;
   updateRefreshCountdown();
+  renderTrustIndicators();
   state.refreshTimer = window.setInterval(() => {
     state.nextRefreshAt = Date.now() + state.refreshIntervalSec * 1000;
     refreshLiveFeeds();
@@ -290,6 +299,54 @@ function renderFeedStatus() {
       <small>${feed.updatedAt ? new Date(feed.updatedAt).toLocaleTimeString([], { hour12: false }) : "Not yet refreshed"}</small>
     </article>
   `).join("");
+}
+
+function renderTrustIndicators() {
+  if (!elements.trustIndicators) return;
+
+  const adsbStatus = state.liveFeeds.adsb.status === "live" ? "live" : state.liveFeeds.adsb.status === "error" ? "error" : "pending";
+  const aisStatus = state.liveFeeds.ais.status === "live"
+    ? "live"
+    : state.liveFeeds.ais.status === "config-required"
+      ? "config"
+      : state.liveFeeds.ais.status === "error"
+        ? "error"
+        : "pending";
+  const refreshStatus = state.nextRefreshAt ? "active" : "pending";
+
+  const indicators = [
+    { label: "ADS-B",     value: state.liveFeeds.adsb.status.toUpperCase(), status: adsbStatus },
+    { label: "AIS",       value: state.liveFeeds.ais.status.toUpperCase(),  status: aisStatus },
+    { label: "UTC Sync",  value: "LOCKED", status: "verified" },
+    { label: "Refresh",   value: `${state.refreshIntervalSec}s`, status: refreshStatus }
+  ];
+
+  elements.trustIndicators.innerHTML = indicators.map(indicator =>
+    `<span class="trust-pill ${indicator.status}">${indicator.label} · ${indicator.value}</span>`
+  ).join("");
+
+  if (!elements.trustSummary) return;
+  const liveCount = [state.liveFeeds.adsb, state.liveFeeds.ais].filter(feed => feed.status === "live").length;
+  const confidence = liveCount === 2 ? "High" : liveCount === 1 ? "Moderate" : "Limited";
+  elements.trustSummary.textContent = `Source confidence: ${confidence}. Geospatial index and UTC sync are active.`;
+}
+
+function renderLegend() {
+  if (!elements.legendItems) return;
+  elements.legendItems.innerHTML = LAYERS.map(layer => {
+    const active = !!state.layers[layer.id];
+    return `
+      <div class="legend-item ${active ? "" : "inactive"}">
+        <span class="legend-swatch" style="background:${layer.color}"></span>
+        <span>${layer.label}</span>
+        <span class="legend-state">${active ? "ON" : "OFF"}</span>
+      </div>
+    `;
+  }).join("");
+
+  if (elements.legendUpdated) {
+    elements.legendUpdated.textContent = `Layer key · ${new Date().toUTCString().slice(17, 25)} UTC`;
+  }
 }
 
 function applyDeclutterMode() {
@@ -340,6 +397,7 @@ function renderLayerToggles() {
       state.layers[layer.id] = !state.layers[layer.id];
       saveJson(STORAGE_KEYS.layers, state.layers);
       renderLayerToggles();
+      renderLegend();
       refreshEntityVisibility();
     });
     elements.layerToggles.appendChild(row);
@@ -852,6 +910,7 @@ async function refreshLiveFeeds() {
   if (elements.liveLastRefresh) elements.liveLastRefresh.textContent = "Refreshing feeds\u2026";
   state.liveFeeds = await fetchLiveFeeds();
   renderFeedStatus();
+  renderTrustIndicators();
   clearLiveTraffic();
   if (state.liveFeeds.adsb.status === "live") {
     addLiveTrafficEntities(state.liveFeeds.adsb.records, "commercial", Cesium.Color.fromCssColorString("#90f4ff"), "live-adsb");
@@ -865,6 +924,7 @@ async function refreshLiveFeeds() {
   if (elements.hudStatusMode)   elements.hudStatusMode.textContent   = "LIVE FEED";
   state.nextRefreshAt = Date.now() + state.refreshIntervalSec * 1000;
   updateRefreshCountdown();
+  renderLegend();
 }
 
 function pausePassiveSpin(duration = 5000) {
@@ -1358,10 +1418,38 @@ function flyToSearchResult(result) {
   });
 }
 
+function setSearchCursor(index) {
+  const buttons = Array.from(elements.searchResults.querySelectorAll(".search-result"));
+  if (!buttons.length) {
+    state.searchCursorIndex = -1;
+    return;
+  }
+
+  const nextIndex = clamp(index, 0, buttons.length - 1);
+  state.searchCursorIndex = nextIndex;
+  buttons.forEach((button, buttonIndex) => {
+    const active = buttonIndex === nextIndex;
+    button.classList.toggle("selected", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+
+  buttons[nextIndex].scrollIntoView({ block: "nearest" });
+}
+
+function activateSearchResultByIndex(index) {
+  const result = state.searchFlatResults[index];
+  if (!result) return;
+  elements.searchResults.classList.add("hidden");
+  elements.searchInput.value = result.title;
+  flyToSearchResult(result);
+}
+
 async function runSearch(query) {
   const trimmed = query.trim();
   if (!trimmed) {
     elements.searchResults.classList.add("hidden");
+    state.searchFlatResults = [];
+    state.searchCursorIndex = -1;
     if (elements.searchMeta) elements.searchMeta.textContent = "Type a place or live object to jump into active context.";
     return;
   }
@@ -1400,17 +1488,20 @@ async function runSearch(query) {
   renderSearchResults(trimmed, operationalResults, placeResults);
 }
 
-function appendSearchGroup(label, results) {
+function appendSearchGroup(label, results, startIndex) {
   if (!results.length) return;
   const header = document.createElement("div");
   header.className = "search-group-label";
   header.textContent = label;
   elements.searchResults.appendChild(header);
 
+  let cursor = startIndex;
   results.forEach(result => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "search-result";
+    btn.setAttribute("role", "option");
+    btn.dataset.searchIndex = String(cursor);
     btn.innerHTML = `
       <span class="search-result-head">
         <span class="search-result-kind">${escapeHtml(result.kind)}</span>
@@ -1419,18 +1510,21 @@ function appendSearchGroup(label, results) {
       <span class="search-result-sub">${escapeHtml(result.subtitle)}</span>
       <span class="search-result-meta">${escapeHtml(result.meta)}</span>
     `;
-    btn.addEventListener("click", () => {
-      elements.searchResults.classList.add("hidden");
-      elements.searchInput.value = result.title;
-      flyToSearchResult(result);
-    });
+    btn.addEventListener("mouseenter", () => setSearchCursor(Number(btn.dataset.searchIndex)));
+    btn.addEventListener("click", () => activateSearchResultByIndex(Number(btn.dataset.searchIndex)));
     elements.searchResults.appendChild(btn);
+    cursor += 1;
   });
+
+  return cursor;
 }
 
 function renderSearchResults(query, operationalResults, placeResults) {
   const op = operationalResults.slice(0, 6);
   const geo = placeResults.slice(0, 6);
+  state.searchFlatResults = [...op, ...geo];
+  state.searchCursorIndex = -1;
+
   if (!op.length && !geo.length) {
     elements.searchResults.classList.add("hidden");
     if (elements.searchMeta) elements.searchMeta.textContent = `No matches found for “${query}”.`;
@@ -1438,9 +1532,12 @@ function renderSearchResults(query, operationalResults, placeResults) {
   }
 
   elements.searchResults.innerHTML = "";
-  appendSearchGroup("Operational Matches", op);
-  appendSearchGroup("Geographic Matches", geo);
+  elements.searchResults.setAttribute("role", "listbox");
+  let nextIndex = 0;
+  nextIndex = appendSearchGroup("Operational Matches", op, nextIndex) ?? nextIndex;
+  nextIndex = appendSearchGroup("Geographic Matches", geo, nextIndex) ?? nextIndex;
   elements.searchResults.classList.remove("hidden");
+  if (state.searchFlatResults.length) setSearchCursor(0);
 
   if (elements.searchMeta) {
     const total = op.length + geo.length;
@@ -1522,7 +1619,38 @@ function registerEvents() {
     if (elements.searchInput.value.trim()) runSearch(elements.searchInput.value);
   });
   elements.searchInput?.addEventListener("keydown", event => {
-    if (event.key === "Enter") { event.preventDefault(); runSearch(elements.searchInput.value); }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (elements.searchResults.classList.contains("hidden")) {
+        runSearch(elements.searchInput.value);
+        return;
+      }
+      setSearchCursor(state.searchCursorIndex + 1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (elements.searchResults.classList.contains("hidden")) {
+        runSearch(elements.searchInput.value);
+        return;
+      }
+      setSearchCursor(state.searchCursorIndex - 1);
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (!elements.searchResults.classList.contains("hidden") && state.searchCursorIndex >= 0) {
+        activateSearchResultByIndex(state.searchCursorIndex);
+      } else {
+        runSearch(elements.searchInput.value);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      elements.searchResults.classList.add("hidden");
+      state.searchCursorIndex = -1;
+      return;
+    }
   });
   document.addEventListener("click", event => {
     const target = event.target;

@@ -148,6 +148,12 @@
           <button id="refresh-feeds" class="panel-btn" type="button">Refresh Feeds</button>
         </div>
       </section>
+
+      <section class="control-group">
+        <h3>Data Assurance</h3>
+        <div id="trust-indicators" class="trust-indicators"></div>
+        <small id="trust-summary" class="feed-hint">Integrity checks initializing…</small>
+      </section>
     </aside>
 
     <section id="floating-summary" class="glass-panel">
@@ -157,6 +163,14 @@
       </div>
       <p id="summary-copy">God's Eye aggregates live ADS-B, AIS vessel data, orbital passes, and geopolitical overlays in real time.</p>
       <div id="summary-tags" class="summary-tags"></div>
+    </section>
+
+    <section id="map-legend" class="glass-panel">
+      <div class="legend-head">
+        <span class="timeline-title">Operational Legend</span>
+        <span id="legend-updated" class="live-caption">Layer key online</span>
+      </div>
+      <div id="legend-items" class="legend-items"></div>
     </section>
 
     <footer id="hud-bottom">
