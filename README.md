@@ -1,48 +1,57 @@
-# Worldline 4D
+# Panopticon Earth
 
-Modern crisis-replay foundation for viewing flights, satellites, jamming, maritime traffic, closures, and cascading events across time.
+Panopticon Earth is a globe-first geospatial intelligence experience inspired by Google Earth, replay consoles, and modern command interfaces.
 
-## What This Build Is
+## What Changed
 
-This version is the foundation of a `3D / 4D worldview-style` application:
+This repository has been fully reworked from a 2D replay dashboard into a `Cesium + Vite` application with:
 
-- `4D playback timeline` for scrubbing through a full situation sequence
-- `sensor-layer fusion` across commercial flights, military flights, satellites, maritime traffic, closures, and jamming
-- `area-of-interest correlation` for seeing what assets are overhead when events occur
-- `modern ops UI` designed for large displays and split-screen laptop monitoring
+- a fully draggable, zoomable, rotatable `3D Earth`
+- layered simulated `commercial flights`, `military traffic`, `satellites`, `maritime routes`, and `incident zones`
+- timeline-driven replay with click-to-jump event chapters
+- scene controls for `home`, `tilt`, `spin`, glow tuning, and visual modes
+- searchable globe navigation plus saved camera bookmarks
 
-The current build uses a modeled replay dataset to prove out the product direction and interaction patterns.
+## Project Structure
 
-## Files
-
-- `index.html` — application shell
-- `styles.css` — modern multi-pane interface and responsive layout
-- `app.js` — replay engine, timeline logic, layers, and UI rendering
-- `server.js` — lightweight static server
-- `ADAN_NOTES.md` — project handoff summary
+- `index.html` — Vite app shell and HUD layout
+- `src/main.js` — Cesium viewer setup, replay engine, UI logic, and interactivity
+- `src/data/scenario.js` — modeled traffic, orbital, maritime, zone, and event data
+- `src/styles/index.css` — globe HUD, glass panels, responsive layout, and FX styling
+- `vite.config.js` — Vite + Cesium configuration
+- `Alpha Launch.bat` — Windows launcher for local development
+- `ADAN_NOTES.md` — handoff summary for the redesign
 
 ## Run Locally
 
-If you have Node.js installed:
+Install dependencies and start the development server:
 
 ```bash
-npm run check
-npm start
+npm install
+npm run dev
 ```
 
-If you want a dependency-free preview on macOS with Ruby:
+Then open `http://localhost:5173`.
+
+To verify the production build:
 
 ```bash
-ruby -run -e httpd . -p 4173
+npm run build
+npm run preview
 ```
 
-Then open `http://localhost:4173`.
+## Current Capabilities
 
-## Product Direction
+- direct globe interaction with drag, pan, tilt, and zoom
+- replay timeline controlling all simulated entities
+- click selection and entity tracking
+- multiple basemaps and visual FX modes
+- persistent saved camera views in local storage
+- public geocoding search using OpenStreetMap Nominatim
 
-The next logical evolution would be:
+## Next Extensions
 
-- replacing the 2D theater map with a dedicated 3D globe engine
-- swapping the modeled replay dataset for real feeds and ingestion pipelines
-- adding scenario libraries, saved viewpoints, and narrative chapters
-- introducing more advanced AOI analytics and asset correlation tooling
+- swap modeled data for live or historical ingest pipelines
+- add true sensor heatmaps and denser traffic layers
+- expand cinematic camera paths and saved scenario playlists
+- integrate real weather, AIS, and ADS-B data where practical

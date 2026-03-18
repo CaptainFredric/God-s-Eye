@@ -2,39 +2,36 @@
 
 ## Overview
 
-This project has been reset into a new product direction: a modern `4D crisis replay` foundation rather than a generic command dashboard. The goal is to visualize evolving situations over time with layered air, orbital, maritime, and disruption data in one replay interface.
+The project has now been pushed past the earlier replay-map phase into a proper `globe-first Panopticon Earth build`. It behaves much more like a controllable Google-Earth-style intelligence surface than a flat dashboard.
 
-## Current Foundation
+## What Was Rebuilt
 
-- New product identity: `Worldline 4D`
-- New layout focused on a central replay theater with left and right intelligence rails
-- Bottom timeline dock for scrubbing, play / pause, reset, and playback speed control
-- Layer system for commercial flights, military flights, satellites, jamming, maritime traffic, closures, and incidents
-- Area-of-interest correlation model showing when overhead assets align with important events
-- Scenario brief, event queue, active event detail, impact cascade, and tracked asset summaries
+- moved the app to `Vite` for a modern front-end workflow
+- replaced the old Leaflet map foundation with a `Cesium 3D globe`
+- introduced direct globe controls so the user can drag, zoom, rotate, tilt, and fly anywhere on Earth
+- rebuilt the interface as a cinematic HUD with left and right control rails plus a bottom replay dock
+- added modeled traffic for commercial aviation, military tracks, satellites, maritime movement, incidents, and disruption zones
 
-## Visualization Direction
+## Operator Features
 
-- Built as a replay engine instead of a static status board
-- Designed to make ordering, escalation, and cascading effects obvious
-- Structured so a future 3D globe can replace the current 2D map without changing the overall product concept
-- Tailored for large-screen use and split-screen laptop monitoring
+- global search with fly-to behavior
+- basemap switching
+- visual FX modes and live tuning sliders
+- play / pause / reset replay transport controls
+- clickable event rail and timeline markers
+- selectable entities with track / release controls
+- persistent saved camera bookmarks
 
-## Data Model Direction
+## Why This Direction Is Better
 
-The current build uses a modeled scenario dataset to prove the workflow:
+- the globe now feels exploratory instead of static
+- the user can inspect any part of Earth instead of staying locked to one theater
+- the traffic simulations make the world feel alive even before real feeds are connected
+- the architecture is now much closer to the kind of geospatial product the user actually asked for
 
-- chapter-based event sequence
-- commercial and military air traffic
-- commercial and defense satellite passes
-- GPS disruption zones
-- maritime traffic through a chokepoint
-- closure polygons and secondary impact zones
+## Logical Next Steps
 
-## What This Enables Next
-
-- real ingestion pipelines for live or historical replay datasets
-- multiple named scenarios and theaters
-- saved viewpoints and analyst notes
-- true 3D globe playback
-- richer AOI analytics and cross-layer correlation
+- add live data ingestion for aircraft, ships, and weather
+- expand the scenario library and saved viewpoints
+- add denser visual analytics like heatmaps, route cones, and sensor sweeps
+- improve object iconography and cinematic flythrough presets

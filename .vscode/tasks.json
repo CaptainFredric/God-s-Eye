@@ -5,6 +5,13 @@
 			"label": "noop",
 			"type": "shell",
 			"command": "true"
+		},
+		{
+			"label": "Install and build Panopticon Earth",
+			"type": "shell",
+			"command": "npm install && npm run build",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }
