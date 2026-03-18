@@ -348,7 +348,7 @@ canvas {
 #panel-right {
   top: 104px;
   bottom: 104px;
-  width: 320px;
+  width: clamp(260px, 24vw, 320px);
   padding: 18px;
   border-radius: 28px;
   overflow: auto;
@@ -723,16 +723,30 @@ canvas {
 
 @media (max-width: 1260px) {
   #hud-top {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
 
+  .hud-logo,
+  .hud-search {
+    grid-column: 1 / -1;
+  }
+
+  .hud-clock-block,
+  .hud-right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  #panel-layers,
   #panel-right {
-    display: none;
+    width: clamp(240px, 27vw, 300px);
   }
 
   #floating-summary {
-    width: min(620px, calc(100vw - 380px));
-    left: calc(50% + 40px);
+    width: min(620px, calc(100vw - 560px));
+    min-width: 320px;
+    left: 50%;
   }
 }
 
@@ -748,12 +762,17 @@ canvas {
   #hud-bottom {
     position: static;
     transform: none;
-    width: auto;
+    width: min(100%, 760px);
     min-width: 0;
-    margin: 12px;
+    margin: 12px auto;
   }
 
   #app {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
     min-height: 100vh;
     padding: 12px;
   }
@@ -767,11 +786,77 @@ canvas {
   #hud-bottom {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   #panel-layers,
   #panel-right {
+    display: block;
     max-height: none;
+  }
+
+  .hud-right,
+  .hud-clock-block {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  #timeline-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .search-results {
+    right: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  #app {
+    padding: 8px;
+  }
+
+  #hud-top,
+  #hud-bottom,
+  #panel-layers,
+  #panel-right,
+  #floating-summary {
+    margin: 8px auto;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-radius: 18px;
+  }
+
+  .logo-text {
+    font-size: 0.86rem;
+    letter-spacing: 0.14em;
+  }
+
+  .logo-sub,
+  #timeline-caption,
+  .layer-description,
+  .event-summary,
+  #summary-copy {
+    font-size: 0.7rem;
+  }
+
+  .hud-chip,
+  .hud-action,
+  .panel-btn,
+  .transport-btn,
+  .basemap-btn,
+  .fx-btn,
+  .search-btn {
+    min-height: 40px;
+  }
+
+  .slider-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .metric-cluster {
+    grid-template-columns: 1fr;
   }
 }
 

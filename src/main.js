@@ -48,11 +48,14 @@ const postStages = {
   blackAndWhite: Cesium.PostProcessStageLibrary.createBlackAndWhiteStage(),
   brightness: Cesium.PostProcessStageLibrary.createBrightnessStage()
 };
+const bloomStage = viewer.scene.postProcessStages.bloom;
 viewer.scene.postProcessStages.add(postStages.blackAndWhite);
 viewer.scene.postProcessStages.add(postStages.brightness);
 viewer.scene.postProcessStages.fxaa.enabled = true;
-viewer.scene.bloom.enabled = true;
-viewer.scene.bloom.uniforms.glowOnly = false;
+if (bloomStage) {
+  bloomStage.enabled = true;
+  bloomStage.uniforms.glowOnly = false;
+}
 viewer.scene.globe.enableLighting = true;
 viewer.scene.skyAtmosphere.show = true;
 viewer.scene.globe.depthTestAgainstTerrain = false;
@@ -138,6 +141,7 @@ function cacheElements() {
   elements.fxIntensity.value = String(state.fxIntensity);
   elements.fxGlow.value = String(state.fxGlow);
   elements.replaySpeed.value = String(state.replaySpeed);
+  elements.timelineSlider.max = String(SCENARIO.durationMinutes);
 }
 
 function loadJson(key, fallback) {
@@ -709,12 +713,15 @@ function applyFxIntensity() {
 
 function applyGlow() {
   elements.fxGlowValue.textContent = String(state.fxGlow);
-  viewer.scene.bloom.uniforms.glowOnly = false;
-  viewer.scene.bloom.uniforms.contrast = 128 - state.fxGlow * 0.4;
-  viewer.scene.bloom.uniforms.brightness = -0.15 + state.fxGlow / 300;
-  viewer.scene.bloom.uniforms.delta = 1 + state.fxGlow / 60;
-  viewer.scene.bloom.uniforms.sigma = 2 + state.fxGlow / 24;
-  viewer.scene.bloom.uniforms.stepSize = 3 + state.fxGlow / 35;
+  if (!bloomStage) {
+    return;
+  }
+  bloomStage.uniforms.glowOnly = false;
+  bloomStage.uniforms.contrast = 128 - state.fxGlow * 0.4;
+  bloomStage.uniforms.brightness = -0.15 + state.fxGlow / 300;
+  bloomStage.uniforms.delta = 1 + state.fxGlow / 60;
+  bloomStage.uniforms.sigma = 2 + state.fxGlow / 24;
+  bloomStage.uniforms.stepSize = 3 + state.fxGlow / 35;
 }
 
 function jumpToMinute(minute) {
