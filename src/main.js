@@ -1,5 +1,5 @@
 import { BASEMAPS, DEFAULT_BOOKMARKS, FX_MODES, LAYERS, SCENARIO, STORAGE_KEYS } from "./data/scenario.js";
-import { fetchLiveFeeds, getConfiguredAisEndpoint } from "./services/live-feeds.js";
+import { fetchLiveFeeds, fetchAisFeed, getConfiguredAisEndpoint, setConfiguredAisEndpoint } from "./services/live-feeds.js";
 
 const Cesium = await loadCesium();
 
@@ -22,6 +22,10 @@ async function loadCesium() {
 
 const replayStart = Cesium.JulianDate.fromDate(new Date(Date.UTC(2026, 2, 17, 0, 0, 0)));
 const replayStop = Cesium.JulianDate.addMinutes(replayStart, SCENARIO.durationMinutes, new Cesium.JulianDate());
+const UI_STORAGE_KEYS = {
+  declutter: "panopticon-earth-declutter",
+  compact: "panopticon-earth-compact"
+};
 
 const state = {
   selectedEntity: null,
@@ -31,6 +35,8 @@ const state = {
   spinPausedUntil: 0,
   activeDrawer: null,
   intelSheetOpen: false,
+  declutter: loadJson(UI_STORAGE_KEYS.declutter, false),
+  compact: loadJson(UI_STORAGE_KEYS.compact, false),
   tiltMode: false,
   searchAbortController: null,
   basemapId: loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
@@ -116,6 +122,8 @@ cacheElements();
 applyFxMode(state.fxMode);
 applyFxIntensity();
 applyGlow();
+applyDeclutterMode();
+applyDensityMode();
 renderMetricCluster();
 renderBasemapButtons();
 renderLayerToggles();
@@ -172,6 +180,11 @@ function cacheElements() {
     btnMobileIntel: document.getElementById("btn-mobile-intel"),
     feedStatus: document.getElementById("feed-status"),
     refreshFeeds: document.getElementById("refresh-feeds"),
+    aisEndpoint: document.getElementById("ais-endpoint"),
+    saveAisEndpoint: document.getElementById("save-ais-endpoint"),
+    clearAisEndpoint: document.getElementById("clear-ais-endpoint"),
+    testAisEndpoint: document.getElementById("test-ais-endpoint"),
+    feedHint: document.getElementById("feed-hint"),
     intelSheet: document.getElementById("intel-sheet"),
     closeIntelSheet: document.getElementById("close-intel-sheet"),
     intelSheetKicker: document.getElementById("intel-sheet-kicker"),
@@ -185,6 +198,8 @@ function cacheElements() {
     hudFps: document.getElementById("hud-fps"),
     hudCamera: document.getElementById("hud-camera"),
     hudStatusText: document.getElementById("hud-status-text"),
+    btnDeclutter: document.getElementById("btn-declutter"),
+    btnDensity: document.getElementById("btn-density"),
     btnHome: document.getElementById("btn-home"),
     btnTilt: document.getElementById("btn-tilt"),
     btnSpin: document.getElementById("btn-spin")
@@ -194,6 +209,9 @@ function cacheElements() {
   elements.fxGlow.value = String(state.fxGlow);
   elements.replaySpeed.value = String(state.replaySpeed);
   elements.timelineSlider.max = String(SCENARIO.durationMinutes);
+  if (elements.aisEndpoint) {
+    elements.aisEndpoint.value = getConfiguredAisEndpoint();
+  }
 }
 
 function loadJson(key, fallback) {
@@ -289,6 +307,24 @@ function renderFeedStatus() {
       <small>${feed.updatedAt ? new Date(feed.updatedAt).toLocaleTimeString([], { hour12: false }) : "Not yet refreshed"}</small>
     </article>
   `).join("");
+}
+
+function applyDeclutterMode() {
+  document.body.classList.toggle("declutter-ui", state.declutter);
+  if (elements.btnDeclutter) {
+    elements.btnDeclutter.classList.toggle("active", state.declutter);
+    elements.btnDeclutter.textContent = state.declutter ? "FOCUS ON" : "FOCUS";
+  }
+  saveJson(UI_STORAGE_KEYS.declutter, state.declutter);
+}
+
+function applyDensityMode() {
+  document.body.classList.toggle("compact-ui", state.compact);
+  if (elements.btnDensity) {
+    elements.btnDensity.classList.toggle("active", state.compact);
+    elements.btnDensity.textContent = state.compact ? "COMPACT ON" : "COMPACT";
+  }
+  saveJson(UI_STORAGE_KEYS.compact, state.compact);
 }
 
 function renderBasemapButtons() {
@@ -799,6 +835,20 @@ function closeIntelSheet() {
   elements.intelSheet.setAttribute("aria-hidden", "true");
 }
 
+async function testAisEndpoint() {
+  if (!elements.feedHint) {
+    return;
+  }
+  elements.feedHint.textContent = "Testing AIS endpoint...";
+  const result = await fetchAisFeed();
+  const count = result.records?.length ?? 0;
+  if (result.status === "live") {
+    elements.feedHint.textContent = `AIS endpoint OK: ${count} vessel tracks available.`;
+    return;
+  }
+  elements.feedHint.textContent = `AIS test: ${result.message}`;
+}
+
 function setMobileDrawer(drawer) {
   state.activeDrawer = state.activeDrawer === drawer ? null : drawer;
   document.body.classList.toggle("mobile-drawer-open", !!state.activeDrawer);
@@ -971,6 +1021,29 @@ function registerEvents() {
   elements.refreshFeeds.addEventListener("click", () => {
     refreshLiveFeeds();
   });
+  elements.saveAisEndpoint.addEventListener("click", () => {
+    const endpoint = elements.aisEndpoint.value.trim();
+    setConfiguredAisEndpoint(endpoint);
+    elements.feedHint.textContent = endpoint
+      ? "AIS endpoint saved. Click Test or Refresh Feeds."
+      : "AIS endpoint cleared.";
+    refreshLiveFeeds();
+  });
+  elements.clearAisEndpoint.addEventListener("click", () => {
+    elements.aisEndpoint.value = "";
+    setConfiguredAisEndpoint("");
+    elements.feedHint.textContent = "AIS endpoint cleared.";
+    refreshLiveFeeds();
+  });
+  elements.testAisEndpoint.addEventListener("click", testAisEndpoint);
+  elements.btnDeclutter.addEventListener("click", () => {
+    state.declutter = !state.declutter;
+    applyDeclutterMode();
+  });
+  elements.btnDensity.addEventListener("click", () => {
+    state.compact = !state.compact;
+    applyDensityMode();
+  });
   elements.closeIntelSheet.addEventListener("click", closeIntelSheet);
   elements.mobileBackdrop.addEventListener("click", () => {
     setMobileDrawer(null);
@@ -1081,6 +1154,47 @@ function registerEvents() {
     viewer.resize();
     if (window.innerWidth > 980) {
       setMobileDrawer(null);
+    }
+  });
+
+  window.addEventListener("keydown", event => {
+    const target = event.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+    if (event.key === "/") {
+      event.preventDefault();
+      elements.searchInput.focus();
+      elements.searchInput.select();
+      return;
+    }
+    if (event.key.toLowerCase() === "f") {
+      state.declutter = !state.declutter;
+      applyDeclutterMode();
+      return;
+    }
+    if (event.key.toLowerCase() === "d") {
+      state.compact = !state.compact;
+      applyDensityMode();
+      return;
+    }
+    if (event.key.toLowerCase() === "l") {
+      setMobileDrawer(window.innerWidth <= 980 ? "layers" : null);
+      return;
+    }
+    if (event.key.toLowerCase() === "c") {
+      setMobileDrawer(window.innerWidth <= 980 ? "controls" : null);
+      return;
+    }
+    if (event.key.toLowerCase() === "i") {
+      if (state.selectedEntity) {
+        openIntelSheet(state.selectedEntity);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      closeIntelSheet();
+      elements.searchResults.classList.add("hidden");
     }
   });
 }

@@ -544,6 +544,47 @@ canvas {
   font-size: 0.68rem;
 }
 
+.feed-settings {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.feed-label {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--muted-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.feed-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.feed-input:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(126, 224, 255, 0.1);
+}
+
+.feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feed-hint {
+  color: var(--muted);
+  line-height: 1.45;
+  font-size: 0.7rem;
+}
+
 .layer-toggle {
   display: flex;
   align-items: center;
@@ -977,6 +1018,41 @@ canvas {
   color: var(--text);
   font-family: "Share Tech Mono", monospace;
   font-size: 0.66rem;
+}
+
+body.declutter-ui .panel-kicker,
+body.declutter-ui #timeline-caption,
+body.declutter-ui .event-summary,
+body.declutter-ui #summary-tags,
+body.declutter-ui .logo-sub {
+  display: none;
+}
+
+body.declutter-ui #floating-summary {
+  width: min(470px, calc(100vw - 760px));
+}
+
+body.compact-ui #hud-top,
+body.compact-ui #hud-bottom {
+  padding: 10px 12px;
+}
+
+body.compact-ui #panel-layers,
+body.compact-ui #panel-right {
+  padding: 14px;
+}
+
+body.compact-ui .metric-card,
+body.compact-ui .layer-toggle,
+body.compact-ui .feed-card,
+body.compact-ui .event-item,
+body.compact-ui .entity-card {
+  padding: 10px;
+  border-radius: 14px;
+}
+
+body.compact-ui .control-group + .control-group {
+  margin-top: 14px;
 }
 
 @media (max-width: 1520px) {

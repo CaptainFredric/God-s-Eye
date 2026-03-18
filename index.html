@@ -42,6 +42,8 @@
         <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-text">BASELINE</span></span>
         <span id="hud-fps" class="hud-chip">— FPS</span>
         <span id="hud-camera" class="hud-chip">ALT — · HEADING —</span>
+        <button id="btn-declutter" class="hud-action" type="button">FOCUS</button>
+        <button id="btn-density" class="hud-action" type="button">COMPACT</button>
         <button id="btn-home" class="hud-action" type="button">HOME</button>
         <button id="btn-tilt" class="hud-action" type="button">TILT</button>
         <button id="btn-spin" class="hud-action" type="button">SPIN</button>
@@ -131,6 +133,16 @@
       <section class="control-group">
         <h3>Live Feeds</h3>
         <div id="feed-status" class="feed-status"></div>
+        <div class="feed-settings">
+          <label for="ais-endpoint" class="feed-label">AIS Endpoint (optional)</label>
+          <input id="ais-endpoint" class="feed-input" type="url" placeholder="https://example.com/ais.json" autocomplete="off" />
+          <div class="feed-actions">
+            <button id="save-ais-endpoint" class="panel-btn primary" type="button">Save</button>
+            <button id="clear-ais-endpoint" class="panel-btn" type="button">Clear</button>
+            <button id="test-ais-endpoint" class="panel-btn" type="button">Test</button>
+          </div>
+          <small id="feed-hint" class="feed-hint">ADS-B is live by default. AIS requires your own CORS-safe JSON endpoint.</small>
+        </div>
         <div class="entity-actions">
           <button id="refresh-feeds" class="panel-btn" type="button">Refresh Feeds</button>
         </div>
