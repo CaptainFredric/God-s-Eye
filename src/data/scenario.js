@@ -88,6 +88,31 @@ export const SCENARIO = {
       region: "GULF",
       title: "Gulf GPS Disruption Active",
       summary: "Persistent GPS jamming in the Gulf corridor affecting commercial and military aviation.",
+      sourceLabel: "OpenSky + Regional NOTAM Watch",
+      sourceUrl: "https://opensky-network.org/",
+      updates: [
+        {
+          title: "Gulf GPS Disruption Active",
+          summary: "Persistent GPS jamming in the Gulf corridor affecting commercial and military aviation.",
+          sourceLabel: "OpenSky + Regional NOTAM Watch",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          title: "Signal Interference Pattern Shifted East",
+          summary: "Interference footprint drifts eastward, pushing additional route planning advisories.",
+          sourceLabel: "Flight planning monitor",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +11 min"
+        },
+        {
+          title: "Corridor Stability Partial Recovery",
+          summary: "Outer edges of the disruption field show partial stabilization while core remains volatile.",
+          sourceLabel: "Aviation operations brief",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +24 min"
+        }
+      ],
       tags: ["jamming", "gulf", "aviation"],
       location: { lng: 53.8, lat: 29.9 }
     },
@@ -96,6 +121,31 @@ export const SCENARIO = {
       region: "ORBIT",
       title: "Imaging Satellites Over AOI",
       summary: "Multiple EO and SAR platforms are currently crossing the Middle East area of interest.",
+      sourceLabel: "Public orbital tracks",
+      sourceUrl: "https://www.n2yo.com/",
+      updates: [
+        {
+          title: "Imaging Satellites Over AOI",
+          summary: "Multiple EO and SAR platforms are currently crossing the Middle East area of interest.",
+          sourceLabel: "Public orbital tracks",
+          sourceUrl: "https://www.n2yo.com/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          title: "Revisit Window Tightened",
+          summary: "Revisit gaps narrowed as additional imaging passes align over the monitored corridor.",
+          sourceLabel: "Orbital timing brief",
+          sourceUrl: "https://www.n2yo.com/",
+          publishedAt: "Update +8 min"
+        },
+        {
+          title: "SAR Coverage Lead Established",
+          summary: "SAR platforms now provide the lead pass before EO handoff in the primary area.",
+          sourceLabel: "Orbital coordination feed",
+          sourceUrl: "https://www.n2yo.com/",
+          publishedAt: "Update +21 min"
+        }
+      ],
       tags: ["satellite", "aoi", "imagery"],
       location: { lng: 54.1, lat: 33.5 }
     },
@@ -104,6 +154,31 @@ export const SCENARIO = {
       region: "CIVIL AIR",
       title: "Rerouting In Progress",
       summary: "Commercial routes are diverting around the most congested and disrupted corridors.",
+      sourceLabel: "Civil traffic model",
+      sourceUrl: "https://opensky-network.org/",
+      updates: [
+        {
+          title: "Rerouting In Progress",
+          summary: "Commercial routes are diverting around the most congested and disrupted corridors.",
+          sourceLabel: "Civil traffic model",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          title: "Westbound Diversions Increase",
+          summary: "Additional westbound long-haul flights have shifted to lower-risk corridors.",
+          sourceLabel: "Route anomaly monitor",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +10 min"
+        },
+        {
+          title: "Holding Patterns Compressed",
+          summary: "Queue compression observed near handoff sectors as alternate paths stabilize.",
+          sourceLabel: "Civil operations board",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +19 min"
+        }
+      ],
       tags: ["commercial", "reroute"],
       location: { lng: 49.8, lat: 27.2 }
     },
@@ -112,6 +187,31 @@ export const SCENARIO = {
       region: "AIRSPACE",
       title: "Regional Closures Extended",
       summary: "Airspace closure zones have expanded west and south; chokepoint restrictions ongoing.",
+      sourceLabel: "Airspace advisories",
+      sourceUrl: "https://www.icao.int/",
+      updates: [
+        {
+          title: "Regional Closures Extended",
+          summary: "Airspace closure zones have expanded west and south; chokepoint restrictions ongoing.",
+          sourceLabel: "Airspace advisories",
+          sourceUrl: "https://www.icao.int/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          title: "Restriction Perimeter Broadened",
+          summary: "Closure perimeter broadened to include secondary approach lanes.",
+          sourceLabel: "Sector NOTAM digest",
+          sourceUrl: "https://www.icao.int/",
+          publishedAt: "Update +14 min"
+        },
+        {
+          title: "Maritime Chokepoint Controls Persist",
+          summary: "Transit controls remain in effect with staggered movement windows.",
+          sourceLabel: "Route safety bulletin",
+          sourceUrl: "https://www.icao.int/",
+          publishedAt: "Update +29 min"
+        }
+      ],
       tags: ["closure", "cascade", "shipping"],
       location: { lng: 46.1, lat: 28.8 }
     },
@@ -120,6 +220,31 @@ export const SCENARIO = {
       region: "PACIFIC",
       title: "Pacific Posture Elevated",
       summary: "Military aviation and ISR monitoring activity increased over the western Pacific.",
+      sourceLabel: "Regional surveillance brief",
+      sourceUrl: "https://opensky-network.org/",
+      updates: [
+        {
+          title: "Pacific Posture Elevated",
+          summary: "Military aviation and ISR monitoring activity increased over the western Pacific.",
+          sourceLabel: "Regional surveillance brief",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          title: "ISR Orbit Density Up",
+          summary: "Additional ISR arcs now overlap priority shipping lanes and nearby patrol sectors.",
+          sourceLabel: "Pacific watch desk",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +9 min"
+        },
+        {
+          title: "Patrol Pattern Realigned",
+          summary: "Patrol vectors are realigned to reduce overlap while maintaining wide-area coverage.",
+          sourceLabel: "Ops posture memo",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +23 min"
+        }
+      ],
       tags: ["pacific", "military", "orbit"],
       location: { lng: 139.2, lat: 29.6 }
     },
@@ -128,6 +253,31 @@ export const SCENARIO = {
       region: "SIGNAL",
       title: "Comms Blackout — Theater Core",
       summary: "Ground reporting remains suppressed across the theater core region.",
+      sourceLabel: "Signal integrity monitor",
+      sourceUrl: "https://www.first.org/",
+      updates: [
+        {
+          title: "Comms Blackout — Theater Core",
+          summary: "Ground reporting remains suppressed across the theater core region.",
+          sourceLabel: "Signal integrity monitor",
+          sourceUrl: "https://www.first.org/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          title: "Partial Uplink Recovery Detected",
+          summary: "Intermittent uplink recovery appears at northern edge nodes but remains unstable.",
+          sourceLabel: "Net telemetry observer",
+          sourceUrl: "https://www.first.org/",
+          publishedAt: "Update +12 min"
+        },
+        {
+          title: "Core Suppression Persists",
+          summary: "Central reporting channels remain suppressed despite edge-node normalization.",
+          sourceLabel: "Signal continuity bulletin",
+          sourceUrl: "https://www.first.org/",
+          publishedAt: "Update +27 min"
+        }
+      ],
       tags: ["signals", "blackout"],
       location: { lng: 51.4, lat: 35.6 }
     }
@@ -398,18 +548,84 @@ export const SCENARIO = {
       id: "incident-aoi",
       label: "AOI Strike",
       description: "Primary event window — elevated activity in this sector.",
+      sourceLabel: "Incident desk",
+      sourceUrl: "https://reliefweb.int/",
+      updates: [
+        {
+          description: "Primary event window — elevated activity in this sector.",
+          sourceLabel: "Incident desk",
+          sourceUrl: "https://reliefweb.int/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          description: "Follow-on activity indicates sustained pressure around the original strike corridor.",
+          sourceLabel: "Field incident brief",
+          sourceUrl: "https://reliefweb.int/",
+          publishedAt: "Update +15 min"
+        },
+        {
+          description: "Peripheral sectors show elevated movement while strike core remains high priority.",
+          sourceLabel: "Sector watch report",
+          sourceUrl: "https://reliefweb.int/",
+          publishedAt: "Update +31 min"
+        }
+      ],
       location: { lng: 53.9, lat: 33.1 }
     },
     {
       id: "incident-blackout",
       label: "Comms Blackout",
       description: "Ground reporting suppressed in the theater core.",
+      sourceLabel: "Signal monitor",
+      sourceUrl: "https://www.first.org/",
+      updates: [
+        {
+          description: "Ground reporting suppressed in the theater core.",
+          sourceLabel: "Signal monitor",
+          sourceUrl: "https://www.first.org/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          description: "Edge relays intermittently reconnect, but primary channels remain unstable.",
+          sourceLabel: "Relay status board",
+          sourceUrl: "https://www.first.org/",
+          publishedAt: "Update +13 min"
+        },
+        {
+          description: "Data continuity remains degraded with burst traffic and repeated blackout windows.",
+          sourceLabel: "Network continuity brief",
+          sourceUrl: "https://www.first.org/",
+          publishedAt: "Update +28 min"
+        }
+      ],
       location: { lng: 51.4, lat: 35.6 }
     },
     {
       id: "incident-pacific",
       label: "Pacific Alert",
       description: "Elevated posture across the western Pacific watch area.",
+      sourceLabel: "Pacific operations watch",
+      sourceUrl: "https://opensky-network.org/",
+      updates: [
+        {
+          description: "Elevated posture across the western Pacific watch area.",
+          sourceLabel: "Pacific operations watch",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Updated moments ago"
+        },
+        {
+          description: "Additional patrol arcs observed near high-volume transit routes.",
+          sourceLabel: "Pacific posture update",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +9 min"
+        },
+        {
+          description: "Regional activity remains elevated with staggered ISR overlap across sectors.",
+          sourceLabel: "Regional ops brief",
+          sourceUrl: "https://opensky-network.org/",
+          publishedAt: "Update +25 min"
+        }
+      ],
       location: { lng: 139.4, lat: 28.7 }
     }
   ],

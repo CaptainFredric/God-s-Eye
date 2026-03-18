@@ -35,6 +35,9 @@ const state = {
   searchDebounceTimer:   null,
   searchCursorIndex:     -1,
   searchFlatResults:     [],
+  alertNarrativeIndexes: Object.create(null),
+  incidentNarrativeIndexes: Object.create(null),
+  narrativeTimer:        null,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -117,6 +120,7 @@ viewer.camera.setView({
 });
 
 cacheElements();
+initializeNarrativeState();
 applyFxMode(state.fxMode);
 applyFxIntensity();
 applyGlow();
@@ -137,9 +141,81 @@ elements.btnSpin.classList.toggle("active", state.spinning);
 startHudClock();
 startWallClock();
 renderEventRail();
+startNarrativeTicker();
 scheduleRefresh();
 refreshLiveFeeds();
 viewer.scene.requestRender();
+
+function initializeNarrativeState() {
+  SCENARIO.alerts.forEach(alert => {
+    state.alertNarrativeIndexes[alert.id] = 0;
+  });
+  SCENARIO.incidents.forEach(incident => {
+    state.incidentNarrativeIndexes[incident.id] = 0;
+  });
+}
+
+function getRotatingNarrative(item, indexMap, textKey) {
+  const updates = Array.isArray(item?.updates) ? item.updates : [];
+  const fallback = {
+    title: item?.title,
+    [textKey]: item?.[textKey],
+    sourceLabel: item?.sourceLabel,
+    sourceUrl: item?.sourceUrl,
+    publishedAt: "Live rolling brief"
+  };
+  if (!updates.length) return fallback;
+  const index = indexMap[item.id] ?? 0;
+  const active = updates[index] ?? updates[0];
+  return {
+    title: active.title ?? fallback.title,
+    [textKey]: active[textKey] ?? fallback[textKey],
+    sourceLabel: active.sourceLabel ?? fallback.sourceLabel,
+    sourceUrl: active.sourceUrl ?? fallback.sourceUrl,
+    publishedAt: active.publishedAt ?? fallback.publishedAt
+  };
+}
+
+function getActiveAlertNarrative(alert) {
+  return getRotatingNarrative(alert, state.alertNarrativeIndexes, "summary");
+}
+
+function getActiveIncidentNarrative(incident) {
+  return getRotatingNarrative(incident, state.incidentNarrativeIndexes, "description");
+}
+
+function findScenarioIncidentById(incidentId) {
+  return SCENARIO.incidents.find(incident => incident.id === incidentId) ?? null;
+}
+
+function tickNarratives() {
+  SCENARIO.alerts.forEach(alert => {
+    const updateCount = Array.isArray(alert.updates) ? alert.updates.length : 0;
+    if (!updateCount) return;
+    state.alertNarrativeIndexes[alert.id] = ((state.alertNarrativeIndexes[alert.id] ?? 0) + 1) % updateCount;
+  });
+
+  SCENARIO.incidents.forEach(incident => {
+    const updateCount = Array.isArray(incident.updates) ? incident.updates.length : 0;
+    if (!updateCount) return;
+    state.incidentNarrativeIndexes[incident.id] = ((state.incidentNarrativeIndexes[incident.id] ?? 0) + 1) % updateCount;
+  });
+
+  renderEventRail(true);
+
+  const selectedType = state.selectedEntity?.properties?.entityType?.getValue?.(viewer.clock.currentTime);
+  if (selectedType === "incident") {
+    updateSelectedEntityCard(state.selectedEntity);
+    if (state.intelSheetOpen) openIntelSheet(state.selectedEntity);
+  }
+}
+
+function startNarrativeTicker() {
+  if (state.narrativeTimer) window.clearInterval(state.narrativeTimer);
+  state.narrativeTimer = window.setInterval(() => {
+    tickNarratives();
+  }, 12000);
+}
 
 function cacheElements() {
   Object.assign(elements, {
@@ -433,26 +509,56 @@ function renderFxButtons() {
   });
 }
 
-function renderEventRail() {
-  elements.eventRail.innerHTML = "";
+function renderEventRail(animate = false) {
+  const existing = new Map(
+    Array.from(elements.eventRail.querySelectorAll(".event-item")).map(button => [button.dataset.alertId, button])
+  );
+
   SCENARIO.alerts.forEach(alert => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "event-item";
-    btn.dataset.alertId = alert.id;
-    btn.innerHTML = `
-      <span class="event-minute">${alert.region}</span>
-      <span class="event-title">${alert.title}</span>
-      <span class="event-summary">${alert.summary}</span>
-    `;
-    btn.addEventListener("click", () => {
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(alert.location.lng, alert.location.lat, 2600000),
-        duration: 1.8,
-        complete: () => applyRegionalContext(alert.title, alert.location.lng, alert.location.lat)
+    let btn = existing.get(alert.id);
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "event-item";
+      btn.dataset.alertId = alert.id;
+      btn.addEventListener("click", () => {
+        const activeNarrative = getActiveAlertNarrative(alert);
+        const activeTitle = activeNarrative.title ?? alert.title;
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(alert.location.lng, alert.location.lat, 2600000),
+          duration: 1.8,
+          complete: () => applyRegionalContext(activeTitle, alert.location.lng, alert.location.lat)
+        });
       });
+      elements.eventRail.appendChild(btn);
+    }
+
+    const narrative = getActiveAlertNarrative(alert);
+    const sourceText = narrative.publishedAt ? escapeHtml(narrative.publishedAt) : "Live rolling brief";
+    const sourceLabel = narrative.sourceLabel ? escapeHtml(narrative.sourceLabel) : "Operational source";
+    const sourceLink = narrative.sourceUrl
+      ? `<a class="event-source-link" href="${escapeHtml(narrative.sourceUrl)}" target="_blank" rel="noopener noreferrer">${sourceLabel} ↗</a>`
+      : `<span class="event-source-label">${sourceLabel}</span>`;
+
+    btn.innerHTML = `
+      <span class="event-minute">${escapeHtml(alert.region)}</span>
+      <span class="event-title">${escapeHtml(narrative.title ?? alert.title)}</span>
+      <span class="event-summary">${escapeHtml(narrative.summary ?? alert.summary)}</span>
+      <span class="event-source-row">
+        <span class="event-source-time">${sourceText}</span>
+        ${sourceLink}
+      </span>
+    `;
+
+    btn.querySelectorAll(".event-source-link").forEach(link => {
+      link.addEventListener("click", event => event.stopPropagation());
     });
-    elements.eventRail.appendChild(btn);
+
+    if (animate) {
+      btn.classList.remove("updating");
+      void btn.offsetWidth;
+      btn.classList.add("updating");
+    }
   });
 }
 
@@ -805,13 +911,21 @@ function updateAmbientEffects() {
 function openIntelSheet(entity) {
   const info = getEntityInfo(entity);
   if (!info || !elements.intelSheet) return;
+  const incident = info.type === "incident" ? findScenarioIncidentById(info.entityId) : null;
+  const incidentNarrative = incident ? getActiveIncidentNarrative(incident) : null;
+  const effectiveDescription = incidentNarrative?.description ?? info.description;
+  const intelSourceLine = incidentNarrative?.sourceUrl
+    ? `<div><a class="intel-source-link" href="${escapeHtml(incidentNarrative.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(incidentNarrative.sourceLabel || "Source article")} ↗</a></div>`
+    : incidentNarrative?.sourceLabel
+      ? `<div>${escapeHtml(incidentNarrative.sourceLabel)}</div>`
+      : "";
   state.intelSheetOpen = true;
   document.body.classList.add("intel-sheet-open");
   elements.intelSheet.classList.remove("hidden");
   elements.intelSheet.setAttribute("aria-hidden", "false");
   elements.intelSheetKicker.textContent   = `${info.type.toUpperCase()} \u2014 LIVE TRACK`;
   elements.intelSheetTitle.textContent    = info.label;
-  elements.intelSheetOverview.textContent = info.description || "Track selected for review.";
+  elements.intelSheetOverview.textContent = effectiveDescription || "Track selected for review.";
   const now = new Date();
   elements.intelSheetTelemetry.innerHTML = `
     <div>${info.locationMeta}</div>
@@ -825,6 +939,7 @@ function openIntelSheet(entity) {
       : "Traffic track contributing to current route density."}</div>
     <div>Feed: ${info.type.startsWith("live-") ? "Live feed adapter" : "Static backdrop overlay"}</div>
     <div>Last updated: ${now.toUTCString().slice(17, 25)} UTC</div>
+    ${intelSourceLine}
   `;
   elements.intelSheetTimeline.innerHTML = [
     { kicker: "Now",  copy: `${info.label} under active surveillance` },
@@ -963,7 +1078,7 @@ function getEntityInfo(entity) {
   }
   const altitude  = props?.altitude?.getValue?.(viewer.clock.currentTime) ?? 0;
   const synthetic = !!props?.synthetic?.getValue?.(viewer.clock.currentTime);
-  return { label, description, type, locationMeta, altitude, synthetic };
+  return { label, description, type, locationMeta, altitude, synthetic, entityId: entity.id };
 }
 
 function hideHoverTooltip() { elements.hoverTooltip.classList.add("hidden"); }
@@ -989,10 +1104,19 @@ function updateSelectedEntityCard(entity) {
     return;
   }
   elements.entityInfo.classList.remove("empty");
-  const { label, description, type, locationMeta, altitude, synthetic } = getEntityInfo(entity);
+  const { label, description, type, locationMeta, altitude, synthetic, entityId } = getEntityInfo(entity);
+  const incident = type === "incident" ? findScenarioIncidentById(entityId) : null;
+  const incidentNarrative = incident ? getActiveIncidentNarrative(incident) : null;
+  const effectiveDescription = incidentNarrative?.description ?? description;
+  const sourceMarkup = incidentNarrative?.sourceUrl
+    ? `<a class="entity-source-link" href="${escapeHtml(incidentNarrative.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(incidentNarrative.sourceLabel || "Source article")} ↗</a>`
+    : incidentNarrative?.sourceLabel
+      ? `<span class="entity-source-text">${escapeHtml(incidentNarrative.sourceLabel)}</span>`
+      : "";
   elements.entityInfo.innerHTML = `
     <strong>${label}</strong>
-    <div>${description}</div>
+    <div>${effectiveDescription}</div>
+    ${sourceMarkup}
     <div class="entity-meta">
       <span>${type.toUpperCase()}</span>
       <span>${locationMeta}</span>
