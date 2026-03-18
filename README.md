@@ -40,6 +40,17 @@ npm run build
 npm run preview
 ```
 
+## GitHub Deployment (Pages)
+
+This repo now includes `.github/workflows/deploy-pages.yml`.
+
+- Push to `main` to auto-build and publish `dist/` to GitHub Pages.
+- In GitHub, set **Settings → Pages → Source** to **GitHub Actions**.
+- Your hosted URL will be:
+	- `https://captainfredric.github.io/God-s-Eye/`
+
+`localhost` itself is not directly reachable from GitHub, but this workflow publishes the same app build from your repo to a public URL.
+
 ## Current Capabilities
 
 - direct globe interaction with drag, pan, tilt, and zoom

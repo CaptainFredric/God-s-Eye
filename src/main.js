@@ -390,7 +390,7 @@ function generateTrafficVariants(items, prefix, variantCount, lngDrift, latDrift
       ...item,
       id: `${item.id}-${prefix.toLowerCase()}-${variantIndex + 1}`,
       label: `${prefix}-${String(driftFactor).padStart(2, "0")}`,
-      description: `${item.description} Synthetic support traffic to keep the globe active.`,
+      description: `${item.description} Auxiliary model track used for density and continuity.`,
       showLabel: false,
       positions: item.positions.map((point, pointIndex) => ({
         ...point,
@@ -752,9 +752,9 @@ function renderIntelTimeline(entity) {
   const info = getEntityInfo(entity);
   const activeEvent = latestEvent(currentMinute());
   return [
-    { kicker: "Current", copy: `${info.label} intersecting ${activeEvent.title}` },
-    { kicker: "Previous", copy: `${formatMinute(Math.max(0, currentMinute() - 8))} · Sensor posture recalibrated` },
-    { kicker: "Next", copy: `${formatMinute(Math.min(SCENARIO.durationMinutes, currentMinute() + 12))} · Track remains on analyst watchlist` }
+    { kicker: "Current", copy: `${info.label} aligned with ${activeEvent.title}` },
+    { kicker: "Previous", copy: `${formatMinute(Math.max(0, currentMinute() - 8))} · Last verified position update` },
+    { kicker: "Next", copy: `${formatMinute(Math.min(SCENARIO.durationMinutes, currentMinute() + 12))} · Continue watchlist monitoring` }
   ];
 }
 
@@ -767,19 +767,19 @@ function openIntelSheet(entity) {
   document.body.classList.add("intel-sheet-open");
   elements.intelSheet.classList.remove("hidden");
   elements.intelSheet.setAttribute("aria-hidden", "false");
-  elements.intelSheetKicker.textContent = `${info.type.toUpperCase()} DOSSIER`;
+  elements.intelSheetKicker.textContent = `${info.type.toUpperCase()} DETAILS`;
   elements.intelSheetTitle.textContent = info.label;
   elements.intelSheetOverview.textContent = info.description || "Track selected for further review.";
   elements.intelSheetTelemetry.innerHTML = `
     <div>${info.locationMeta}</div>
     <div>Altitude: ${Math.round(info.altitude).toLocaleString()} m</div>
-    <div>Status: ${viewer.clock.shouldAnimate ? "Live replay" : "Paused review"}</div>
-    <div>Class: ${info.synthetic ? "Synthetic support" : "Primary operational track"}</div>
+    <div>Status: ${viewer.clock.shouldAnimate ? "Replay running" : "Replay paused"}</div>
+    <div>Class: ${info.synthetic ? "Auxiliary model track" : "Primary track"}</div>
   `;
   elements.intelSheetAssessment.innerHTML = `
-    <div>${info.type === "military" || info.type === "radar" ? "High-interest collection asset with projected surveillance envelope." : "Traffic object contributing to theater density and route pressure."}</div>
+    <div>${info.type === "military" || info.type === "radar" ? "Military-linked track with active radar coverage." : "Traffic track contributing to current route density."}</div>
     <div>Active event: ${latestEvent(currentMinute()).title}</div>
-    <div>Feed context: ${info.type.startsWith("live-") ? "Live adapter" : "Scenario / replay model"}</div>
+    <div>Feed context: ${info.type.startsWith("live-") ? "Live feed adapter" : "Scenario replay model"}</div>
   `;
   elements.intelSheetTimeline.innerHTML = renderIntelTimeline(entity).map(item => `
     <div class="intel-timeline-item">
@@ -1148,7 +1148,7 @@ function updateIncidents(minute) {
 function updateSelectedEntityCard(entity) {
   if (!entity) {
     elements.entityInfo.classList.add("empty");
-    elements.entityInfo.innerHTML = "Select a flight, satellite, ship, event, or zone on the globe.";
+    elements.entityInfo.innerHTML = "Select a track, satellite, ship, event, or zone on the globe.";
     updateTrackButtons();
     return;
   }
@@ -1163,8 +1163,8 @@ function updateSelectedEntityCard(entity) {
     </div>
     <div class="entity-stats">
       <span>ALT ${Math.round(altitude).toLocaleString()} m</span>
-      <span>${synthetic ? "SYNTHETIC SUPPORT" : "PRIMARY TRACK"}</span>
-      <span>${viewer.clock.shouldAnimate ? "LIVE REPLAY" : "REVIEW MODE"}</span>
+      <span>${synthetic ? "AUX MODEL" : "PRIMARY TRACK"}</span>
+      <span>${viewer.clock.shouldAnimate ? "REPLAY RUNNING" : "REPLAY PAUSED"}</span>
     </div>
   `;
   elements.entityInfo.onclick = () => openIntelSheet(entity);

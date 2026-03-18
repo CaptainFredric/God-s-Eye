@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="stylesheet" href="/cesium/Widgets/widgets.css">
-  <script src="/cesium/Cesium.js"></script>
+  <link rel="stylesheet" href="cesium/Widgets/widgets.css">
+  <script src="cesium/Cesium.js"></script>
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="/assets/index-DlvrZcf6.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CJrxnOoG.css">
+  <script type="module" crossorigin src="./assets/index-BiIspbXb.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CJrxnOoG.css">
 </head>
 <body>
   <div id="app">
@@ -26,7 +26,7 @@
         <span class="logo-icon">◈</span>
         <div>
           <div class="logo-text">PANOPTICON EARTH</div>
-          <div class="logo-sub">Interactive globe · layered replay traffic · orbital surveillance</div>
+          <div class="logo-sub">Interactive globe · replay traffic · orbital monitoring</div>
         </div>
       </div>
 
@@ -63,7 +63,7 @@
     <aside id="panel-layers" class="glass-panel">
       <div class="panel-header">
         <h2 class="panel-title">Global Layers</h2>
-        <span class="panel-kicker">Click, drag, zoom, and pivot anywhere</span>
+        <span class="panel-kicker">Browse and filter global context</span>
       </div>
 
       <section class="metric-cluster" id="metric-cluster"></section>
@@ -90,8 +90,8 @@
 
     <aside id="panel-right" class="glass-panel">
       <div class="panel-header">
-        <h2 class="panel-title">Scene Control</h2>
-        <span class="panel-kicker">Cinematic tuning and tracking</span>
+        <h2 class="panel-title">Controls</h2>
+        <span class="panel-kicker">View tuning, tracking, and feed status</span>
       </div>
 
       <section class="control-group">
@@ -100,7 +100,7 @@
       </section>
 
       <section class="control-group sliders">
-        <h3>Live Tuning</h3>
+        <h3>View Tuning</h3>
         <label class="slider-row">
           <span>FX Intensity</span>
           <input id="fx-intensity" type="range" min="0" max="100" value="58" />
@@ -120,7 +120,7 @@
 
       <section class="control-group">
         <h3>Selected Object</h3>
-        <div id="entity-info" class="entity-card empty">Select a flight, satellite, ship, event, or zone on the globe.</div>
+        <div id="entity-info" class="entity-card empty">Select a track, satellite, ship, event, or zone on the globe.</div>
         <div class="entity-actions">
           <button id="track-selected" class="panel-btn primary" type="button" disabled>Track</button>
           <button id="release-track" class="panel-btn" type="button" disabled>Release</button>
@@ -128,7 +128,7 @@
       </section>
 
       <section class="control-group">
-        <h3>Replay Highlights</h3>
+        <h3>Timeline Highlights</h3>
         <div id="event-rail" class="event-rail"></div>
       </section>
 
@@ -143,10 +143,10 @@
 
     <section id="floating-summary" class="glass-panel">
       <div class="summary-head">
-        <span id="summary-stage">Monitoring baseline</span>
+        <span id="summary-stage">Monitoring</span>
         <span id="summary-time">T+00:00Z</span>
       </div>
-      <p id="summary-copy">Panopticon Earth merges aircraft, maritime traffic, satellites, and event overlays into a globe-first exploratory interface.</p>
+      <p id="summary-copy">Panopticon Earth combines air, maritime, orbital, and event overlays in one globe view.</p>
       <div id="summary-tags" class="summary-tags"></div>
     </section>
 
@@ -160,7 +160,7 @@
       <div id="timeline-shell">
         <div id="timeline-meta">
           <span class="timeline-title">World Replay</span>
-          <span id="timeline-caption">Simulated traffic, jamming, closures, and orbital passes unfold across the globe in time.</span>
+          <span id="timeline-caption">Traffic, closures, and orbital passes shown over time.</span>
         </div>
         <div id="timeline-track">
           <div id="timeline-markers"></div>
@@ -174,7 +174,7 @@
     <aside id="intel-sheet" class="intel-sheet hidden" aria-hidden="true">
       <div class="intel-sheet-head">
         <div>
-          <div id="intel-sheet-kicker" class="intel-sheet-kicker">INTEL SHEET</div>
+          <div id="intel-sheet-kicker" class="intel-sheet-kicker">TRACK DETAILS</div>
           <h2 id="intel-sheet-title" class="intel-sheet-title">No Track Selected</h2>
         </div>
         <button id="close-intel-sheet" class="panel-btn" type="button">Close</button>

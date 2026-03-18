@@ -72,7 +72,7 @@ export const DEFAULT_BOOKMARKS = [
 
 export const SCENARIO = {
   title: "Panopticon Earth",
-  subtitle: "A globe-first intelligence sandbox for replaying traffic, orbits, incidents, and closures with direct camera control.",
+  subtitle: "A globe-first monitoring workspace for replaying traffic, orbits, incidents, and closures.",
   durationMinutes: 120,
   initialView: {
     lng: 34,
@@ -86,64 +86,64 @@ export const SCENARIO = {
     {
       id: "baseline",
       minute: 0,
-      title: "Global baseline established",
-      summary: "Panopticon Earth opens with transcontinental civilian air traffic, maritime shipping, and orbital passes already in motion.",
+      title: "Global baseline",
+      summary: "Civil air traffic, maritime routes, and orbital passes are active at startup.",
       tags: ["air", "maritime", "orbit"],
       location: { lng: 26.4, lat: 35.1 }
     },
     {
       id: "gulf-jamming",
       minute: 16,
-      title: "Gulf navigation jamming intensifies",
-      summary: "Disruption tiles expand over the Gulf corridor, distorting tracks and triggering early reroute behavior.",
+      title: "Gulf jamming increase",
+      summary: "Disruption zones expand in the Gulf corridor and trigger early reroutes.",
       tags: ["jamming", "gulf", "aviation"],
       location: { lng: 53.8, lat: 29.9 }
     },
     {
       id: "orbital-focus",
       minute: 28,
-      title: "Orbital collection converges",
-      summary: "Commercial and state imaging platforms align over multiple hotspots across the Gulf and Levant.",
+      title: "Orbital focus",
+      summary: "Imaging platforms align over key hotspots across the Gulf and Levant.",
       tags: ["satellite", "aoi", "imagery"],
       location: { lng: 54.1, lat: 33.5 }
     },
     {
       id: "corridor-bend",
       minute: 41,
-      title: "Civilian routes bend away",
-      summary: "Airliners and cargo traffic begin avoiding the most disrupted corridors, creating visible track arcs on the globe.",
+      title: "Civil routes adjust",
+      summary: "Airliners and cargo routes shift away from the most disrupted corridors.",
       tags: ["commercial", "reroute"],
       location: { lng: 49.8, lat: 27.2 }
     },
     {
       id: "zero-hour",
       minute: 56,
-      title: "Zero-hour strike sequence",
-      summary: "A concentrated event window lights up across the AOI while support aircraft and satellites reposition in response.",
+      title: "Primary event window",
+      summary: "Activity intensifies across the AOI while support aircraft and satellites reposition.",
       tags: ["strike", "aoi", "military"],
       location: { lng: 53.9, lat: 33.1 }
     },
     {
       id: "closure-wave",
       minute: 73,
-      title: "Closure wave spreads regionally",
-      summary: "Airspace and chokepoint closures ripple west and south, changing both air traffic and tanker behavior.",
+      title: "Regional closure spread",
+      summary: "Airspace and chokepoint closures expand west and south, changing route behavior.",
       tags: ["closure", "cascade", "shipping"],
       location: { lng: 46.1, lat: 28.8 }
     },
     {
       id: "pacific-alert",
       minute: 88,
-      title: "Pacific posture hardens",
-      summary: "Military aviation and orbital monitoring spike over the western Pacific, broadening the theater beyond a single region.",
+      title: "Pacific alert",
+      summary: "Military aviation and orbital monitoring increase over the western Pacific.",
       tags: ["pacific", "military", "orbit"],
       location: { lng: 139.2, lat: 29.6 }
     },
     {
       id: "global-afterglow",
       minute: 120,
-      title: "Persistent afterglow",
-      summary: "Traffic normalizes unevenly while satellite interest and operator monitoring remain elevated worldwide.",
+      title: "Global stabilization",
+      summary: "Traffic begins to normalize while satellite monitoring remains elevated.",
       tags: ["aftermath", "global"],
       location: { lng: 11.4, lat: 46.2 }
     }
