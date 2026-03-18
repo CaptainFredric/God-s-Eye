@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="/assets/index-C6GL0Pyp.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DjyXkQ2z.css">
+  <script type="module" crossorigin src="/assets/index-DlvrZcf6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CJrxnOoG.css">
 </head>
 <body>
   <div id="app">
@@ -51,6 +51,14 @@
         <button id="btn-spin" class="hud-action" type="button">SPIN</button>
       </div>
     </header>
+
+    <div id="mobile-drawers" class="mobile-drawers">
+      <button id="btn-mobile-layers" class="hud-action" type="button">LAYERS</button>
+      <button id="btn-mobile-controls" class="hud-action" type="button">CONTROL</button>
+      <button id="btn-mobile-intel" class="hud-action" type="button">INTEL</button>
+    </div>
+
+    <div id="mobile-backdrop" class="mobile-backdrop hidden"></div>
 
     <aside id="panel-layers" class="glass-panel">
       <div class="panel-header">
@@ -123,6 +131,14 @@
         <h3>Replay Highlights</h3>
         <div id="event-rail" class="event-rail"></div>
       </section>
+
+      <section class="control-group">
+        <h3>Live Feeds</h3>
+        <div id="feed-status" class="feed-status"></div>
+        <div class="entity-actions">
+          <button id="refresh-feeds" class="panel-btn" type="button">Refresh Feeds</button>
+        </div>
+      </section>
     </aside>
 
     <section id="floating-summary" class="glass-panel">
@@ -154,6 +170,36 @@
     </footer>
 
     <div id="hover-tooltip" class="hover-tooltip hidden"></div>
+
+    <aside id="intel-sheet" class="intel-sheet hidden" aria-hidden="true">
+      <div class="intel-sheet-head">
+        <div>
+          <div id="intel-sheet-kicker" class="intel-sheet-kicker">INTEL SHEET</div>
+          <h2 id="intel-sheet-title" class="intel-sheet-title">No Track Selected</h2>
+        </div>
+        <button id="close-intel-sheet" class="panel-btn" type="button">Close</button>
+      </div>
+      <div class="intel-sheet-body">
+        <section class="intel-sheet-section">
+          <h3>Overview</h3>
+          <div id="intel-sheet-overview" class="intel-sheet-copy">Click an entity to inspect operational details.</div>
+        </section>
+        <section class="intel-sheet-section intel-grid">
+          <div>
+            <h3>Telemetry</h3>
+            <div id="intel-sheet-telemetry" class="intel-sheet-copy"></div>
+          </div>
+          <div>
+            <h3>Assessment</h3>
+            <div id="intel-sheet-assessment" class="intel-sheet-copy"></div>
+          </div>
+        </section>
+        <section class="intel-sheet-section">
+          <h3>Timeline</h3>
+          <div id="intel-sheet-timeline" class="intel-timeline"></div>
+        </section>
+      </div>
+    </aside>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>

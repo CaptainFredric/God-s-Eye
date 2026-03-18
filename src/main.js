@@ -1,4 +1,5 @@
 import { BASEMAPS, DEFAULT_BOOKMARKS, FX_MODES, LAYERS, SCENARIO, STORAGE_KEYS } from "./data/scenario.js";
+import { fetchLiveFeeds, getConfiguredAisEndpoint } from "./services/live-feeds.js";
 
 const Cesium = await loadCesium();
 
@@ -28,6 +29,8 @@ const state = {
   hoveredEntity: null,
   spinning: true,
   spinPausedUntil: 0,
+  activeDrawer: null,
+  intelSheetOpen: false,
   tiltMode: false,
   searchAbortController: null,
   basemapId: loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
@@ -36,7 +39,11 @@ const state = {
   layers: loadJson(STORAGE_KEYS.layers, Object.fromEntries(LAYERS.map(layer => [layer.id, layer.enabled]))),
   replaySpeed: 8,
   fxIntensity: 58,
-  fxGlow: 30
+  fxGlow: 30,
+  liveFeeds: {
+    adsb: { status: "idle", source: "OpenSky ADS-B", message: "Awaiting refresh", records: [], updatedAt: null },
+    ais: { status: getConfiguredAisEndpoint() ? "idle" : "config-required", source: "AIS Adapter", message: getConfiguredAisEndpoint() ? "Awaiting refresh" : "Configure a CORS-safe AIS endpoint", records: [], updatedAt: null }
+  }
 };
 
 const elements = {};
@@ -45,7 +52,9 @@ const dynamic = {
   zones: [],
   incidents: [],
   traffic: [],
-  rings: []
+  rings: [],
+  radars: [],
+  liveTraffic: []
 };
 
 let frameSamples = [];
@@ -115,10 +124,13 @@ renderFxButtons();
 renderTimelineMarkers();
 installBasemap(state.basemapId);
 seedScene();
+renderFeedStatus();
 registerEvents();
 elements.btnSpin.classList.toggle("active", state.spinning);
 updateScene(viewer.clock.currentTime);
 startHudClock();
+refreshLiveFeeds();
+window.setInterval(refreshLiveFeeds, 90000);
 viewer.scene.requestRender();
 
 function cacheElements() {
@@ -153,6 +165,21 @@ function cacheElements() {
     searchButton: document.getElementById("search-btn"),
     searchResults: document.getElementById("search-results"),
     hoverTooltip: document.getElementById("hover-tooltip"),
+    mobileDrawers: document.getElementById("mobile-drawers"),
+    mobileBackdrop: document.getElementById("mobile-backdrop"),
+    btnMobileLayers: document.getElementById("btn-mobile-layers"),
+    btnMobileControls: document.getElementById("btn-mobile-controls"),
+    btnMobileIntel: document.getElementById("btn-mobile-intel"),
+    feedStatus: document.getElementById("feed-status"),
+    refreshFeeds: document.getElementById("refresh-feeds"),
+    intelSheet: document.getElementById("intel-sheet"),
+    closeIntelSheet: document.getElementById("close-intel-sheet"),
+    intelSheetKicker: document.getElementById("intel-sheet-kicker"),
+    intelSheetTitle: document.getElementById("intel-sheet-title"),
+    intelSheetOverview: document.getElementById("intel-sheet-overview"),
+    intelSheetTelemetry: document.getElementById("intel-sheet-telemetry"),
+    intelSheetAssessment: document.getElementById("intel-sheet-assessment"),
+    intelSheetTimeline: document.getElementById("intel-sheet-timeline"),
     hudUtc: document.getElementById("hud-utc"),
     hudLocal: document.getElementById("hud-local"),
     hudFps: document.getElementById("hud-fps"),
@@ -245,6 +272,23 @@ function updateMetricCard(key, value, foot) {
   if (footElement) {
     footElement.textContent = foot;
   }
+}
+
+function renderFeedStatus() {
+  if (!elements.feedStatus) {
+    return;
+  }
+  const feeds = [state.liveFeeds.adsb, state.liveFeeds.ais];
+  elements.feedStatus.innerHTML = feeds.map(feed => `
+    <article class="feed-card ${feed.status}">
+      <div class="feed-card-head">
+        <strong>${feed.source}</strong>
+        <span>${feed.status.toUpperCase()}</span>
+      </div>
+      <p>${feed.message}</p>
+      <small>${feed.updatedAt ? new Date(feed.updatedAt).toLocaleTimeString([], { hour12: false }) : "Not yet refreshed"}</small>
+    </article>
+  `).join("");
 }
 
 function renderBasemapButtons() {
@@ -415,7 +459,87 @@ function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) 
     entity._pulseSeed = Math.random() * Math.PI * 2;
     entity._layerColor = color;
     dynamic.traffic.push(entity);
+    if (layerId === "military") {
+      createRadarSweep(entity, color);
+    }
   });
+}
+
+function destinationPoint(latDeg, lngDeg, distanceMeters, bearingDeg) {
+  const angularDistance = distanceMeters / 6378137;
+  const bearing = Cesium.Math.toRadians(bearingDeg);
+  const lat = Cesium.Math.toRadians(latDeg);
+  const lng = Cesium.Math.toRadians(lngDeg);
+  const targetLat = Math.asin(
+    Math.sin(lat) * Math.cos(angularDistance) +
+    Math.cos(lat) * Math.sin(angularDistance) * Math.cos(bearing)
+  );
+  const targetLng = lng + Math.atan2(
+    Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(lat),
+    Math.cos(angularDistance) - Math.sin(lat) * Math.sin(targetLat)
+  );
+  return {
+    lat: Cesium.Math.toDegrees(targetLat),
+    lng: Cesium.Math.toDegrees(targetLng)
+  };
+}
+
+function headingBetweenPositions(current, next) {
+  if (!current || !next) {
+    return 0;
+  }
+  const currentCartographic = Cesium.Cartographic.fromCartesian(current);
+  const nextCartographic = Cesium.Cartographic.fromCartesian(next);
+  const dLon = nextCartographic.longitude - currentCartographic.longitude;
+  const y = Math.sin(dLon) * Math.cos(nextCartographic.latitude);
+  const x =
+    Math.cos(currentCartographic.latitude) * Math.sin(nextCartographic.latitude) -
+    Math.sin(currentCartographic.latitude) * Math.cos(nextCartographic.latitude) * Math.cos(dLon);
+  return (Cesium.Math.toDegrees(Math.atan2(y, x)) + 360) % 360;
+}
+
+function createRadarSweep(entity, color) {
+  const radarColor = color.brighten(0.2, new Cesium.Color());
+  const radarEntity = viewer.entities.add({
+    id: `${entity.id}-radar`,
+    polygon: {
+      hierarchy: new Cesium.CallbackProperty(() => {
+        const currentPosition = entity.position?.getValue?.(viewer.clock.currentTime);
+        const aheadTime = Cesium.JulianDate.addSeconds(viewer.clock.currentTime, 45, new Cesium.JulianDate());
+        const futurePosition = entity.position?.getValue?.(aheadTime);
+        if (!currentPosition) {
+          return undefined;
+        }
+        const currentCartographic = Cesium.Cartographic.fromCartesian(currentPosition);
+        const centerLat = Cesium.Math.toDegrees(currentCartographic.latitude);
+        const centerLng = Cesium.Math.toDegrees(currentCartographic.longitude);
+        const baseHeading = headingBetweenPositions(currentPosition, futurePosition);
+        const sweepHeading = baseHeading + Math.sin(currentMinute() * 0.9 + entity._pulseSeed) * 62;
+        const halfAngle = 18;
+        const rangeMeters = 260000;
+        const sectorPoints = [centerLng, centerLat];
+        for (let step = 0; step <= 12; step += 1) {
+          const bearing = sweepHeading - halfAngle + (step / 12) * halfAngle * 2;
+          const point = destinationPoint(centerLat, centerLng, rangeMeters, bearing);
+          sectorPoints.push(point.lng, point.lat);
+        }
+        return new Cesium.PolygonHierarchy(Cesium.Cartesian3.fromDegreesArray(sectorPoints));
+      }, false),
+      material: radarColor.withAlpha(0.14),
+      outline: true,
+      outlineColor: radarColor.withAlpha(0.42),
+      perPositionHeight: false,
+      height: 0
+    },
+    properties: {
+      layerId: "military",
+      label: `${entity.properties.label.getValue(viewer.clock.currentTime)} Radar Sweep`,
+      description: "Ground-projected radar search cone linked to military track heading.",
+      entityType: "radar"
+    }
+  });
+  radarEntity._pulseSeed = entity._pulseSeed;
+  dynamic.radars.push({ entity: radarEntity, parent: entity });
 }
 
 function createZones() {
@@ -532,6 +656,13 @@ function refreshEntityVisibility() {
     const layerId = entity.properties.layerId.getValue();
     entity.show = !!state.layers[layerId];
   });
+  dynamic.radars.forEach(({ entity }) => {
+    entity.show = !!state.layers.military;
+  });
+  dynamic.liveTraffic.forEach(entity => {
+    const layerId = entity.properties.layerId.getValue(viewer.clock.currentTime);
+    entity.show = !!state.layers[layerId];
+  });
 }
 
 function pausePassiveSpin(duration = 5000) {
@@ -604,7 +735,7 @@ function showHoverTooltip(entity, screenPosition) {
 }
 
 function updateLiveMetrics(minute) {
-  const visibleTraffic = dynamic.traffic.filter(entity => entity.show).length;
+  const visibleTraffic = dynamic.traffic.filter(entity => entity.show).length + dynamic.liveTraffic.filter(entity => entity.show).length;
   const activeAlerts = dynamic.incidents.filter(({ entity }) => entity.show).length + dynamic.zones.filter(({ entity }) => entity.show).length;
   const visibleOrbits = dynamic.traffic.filter(entity => entity.show && entity.properties.layerId.getValue(viewer.clock.currentTime) === "satellites").length;
   const currentEvent = latestEvent(minute);
@@ -617,6 +748,122 @@ function updateLiveMetrics(minute) {
   }
 }
 
+function renderIntelTimeline(entity) {
+  const info = getEntityInfo(entity);
+  const activeEvent = latestEvent(currentMinute());
+  return [
+    { kicker: "Current", copy: `${info.label} intersecting ${activeEvent.title}` },
+    { kicker: "Previous", copy: `${formatMinute(Math.max(0, currentMinute() - 8))} · Sensor posture recalibrated` },
+    { kicker: "Next", copy: `${formatMinute(Math.min(SCENARIO.durationMinutes, currentMinute() + 12))} · Track remains on analyst watchlist` }
+  ];
+}
+
+function openIntelSheet(entity) {
+  const info = getEntityInfo(entity);
+  if (!info || !elements.intelSheet) {
+    return;
+  }
+  state.intelSheetOpen = true;
+  document.body.classList.add("intel-sheet-open");
+  elements.intelSheet.classList.remove("hidden");
+  elements.intelSheet.setAttribute("aria-hidden", "false");
+  elements.intelSheetKicker.textContent = `${info.type.toUpperCase()} DOSSIER`;
+  elements.intelSheetTitle.textContent = info.label;
+  elements.intelSheetOverview.textContent = info.description || "Track selected for further review.";
+  elements.intelSheetTelemetry.innerHTML = `
+    <div>${info.locationMeta}</div>
+    <div>Altitude: ${Math.round(info.altitude).toLocaleString()} m</div>
+    <div>Status: ${viewer.clock.shouldAnimate ? "Live replay" : "Paused review"}</div>
+    <div>Class: ${info.synthetic ? "Synthetic support" : "Primary operational track"}</div>
+  `;
+  elements.intelSheetAssessment.innerHTML = `
+    <div>${info.type === "military" || info.type === "radar" ? "High-interest collection asset with projected surveillance envelope." : "Traffic object contributing to theater density and route pressure."}</div>
+    <div>Active event: ${latestEvent(currentMinute()).title}</div>
+    <div>Feed context: ${info.type.startsWith("live-") ? "Live adapter" : "Scenario / replay model"}</div>
+  `;
+  elements.intelSheetTimeline.innerHTML = renderIntelTimeline(entity).map(item => `
+    <div class="intel-timeline-item">
+      <strong>${item.kicker}</strong>
+      <span>${item.copy}</span>
+    </div>
+  `).join("");
+}
+
+function closeIntelSheet() {
+  state.intelSheetOpen = false;
+  document.body.classList.remove("intel-sheet-open");
+  if (!elements.intelSheet) {
+    return;
+  }
+  elements.intelSheet.classList.add("hidden");
+  elements.intelSheet.setAttribute("aria-hidden", "true");
+}
+
+function setMobileDrawer(drawer) {
+  state.activeDrawer = state.activeDrawer === drawer ? null : drawer;
+  document.body.classList.toggle("mobile-drawer-open", !!state.activeDrawer);
+  document.body.classList.toggle("mobile-layers-open", state.activeDrawer === "layers");
+  document.body.classList.toggle("mobile-controls-open", state.activeDrawer === "controls");
+  elements.mobileBackdrop.classList.toggle("hidden", !state.activeDrawer);
+}
+
+function clearLiveTraffic() {
+  dynamic.liveTraffic.forEach(entity => viewer.entities.remove(entity));
+  dynamic.liveTraffic.length = 0;
+}
+
+function addLiveTrafficEntities(records, layerId, color, entityType) {
+  records.forEach(record => {
+    const entity = viewer.entities.add({
+      id: record.id,
+      position: Cesium.Cartesian3.fromDegrees(record.lng, record.lat, record.altitude ?? 0),
+      point: {
+        pixelSize: layerId === "maritime" ? 7 : 8,
+        color,
+        outlineColor: Cesium.Color.WHITE.withAlpha(0.6),
+        outlineWidth: 1,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      label: {
+        text: record.label,
+        font: '11px "Share Tech Mono"',
+        fillColor: Cesium.Color.WHITE,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString("rgba(4,10,18,0.68)"),
+        pixelOffset: new Cesium.Cartesian2(10, -8),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scale: 0.76,
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 12000000)
+      },
+      properties: {
+        layerId,
+        label: record.label,
+        description: `${record.source} live feed`,
+        entityType,
+        altitude: record.altitude ?? 0,
+        synthetic: false
+      }
+    });
+    entity._basePixelSize = layerId === "maritime" ? 7 : 8;
+    entity._pulseSeed = Math.random() * Math.PI * 2;
+    dynamic.liveTraffic.push(entity);
+  });
+}
+
+async function refreshLiveFeeds() {
+  state.liveFeeds = await fetchLiveFeeds();
+  renderFeedStatus();
+  clearLiveTraffic();
+  if (state.liveFeeds.adsb.status === "live") {
+    addLiveTrafficEntities(state.liveFeeds.adsb.records, "commercial", Cesium.Color.fromCssColorString("#90f4ff"), "live-adsb");
+  }
+  if (state.liveFeeds.ais.status === "live") {
+    addLiveTrafficEntities(state.liveFeeds.ais.records, "maritime", Cesium.Color.fromCssColorString("#7bffcb"), "live-ais");
+  }
+  refreshEntityVisibility();
+  updateScene(viewer.clock.currentTime);
+}
+
 function updateAmbientEffects() {
   const phase = performance.now() / 700;
   dynamic.traffic.forEach(entity => {
@@ -626,6 +873,13 @@ function updateAmbientEffects() {
     const layerId = entity.properties.layerId.getValue(viewer.clock.currentTime);
     const pulseRange = layerId === "military" ? 1.8 : layerId === "commercial" ? 0.9 : layerId === "satellites" ? 0.6 : 0.7;
     entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase + entity._pulseSeed)) * pulseRange;
+  });
+
+  dynamic.liveTraffic.forEach(entity => {
+    if (!entity.show || !entity.point) {
+      return;
+    }
+    entity.point.pixelSize = entity._basePixelSize + Math.max(0, Math.sin(phase * 1.15 + entity._pulseSeed)) * 1.6;
   });
 
   dynamic.incidents.forEach(({ entity }) => {
@@ -714,6 +968,22 @@ function registerEvents() {
     saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
     renderBookmarks();
   });
+  elements.refreshFeeds.addEventListener("click", () => {
+    refreshLiveFeeds();
+  });
+  elements.closeIntelSheet.addEventListener("click", closeIntelSheet);
+  elements.mobileBackdrop.addEventListener("click", () => {
+    setMobileDrawer(null);
+    closeIntelSheet();
+  });
+  elements.btnMobileLayers.addEventListener("click", () => setMobileDrawer("layers"));
+  elements.btnMobileControls.addEventListener("click", () => setMobileDrawer("controls"));
+  elements.btnMobileIntel.addEventListener("click", () => {
+    if (!state.selectedEntity) {
+      return;
+    }
+    openIntelSheet(state.selectedEntity);
+  });
   elements.trackSelected.addEventListener("click", () => {
     if (state.selectedEntity) {
       viewer.trackedEntity = state.selectedEntity;
@@ -779,6 +1049,8 @@ function registerEvents() {
       state.selectedEntity = picked.id;
       updateSelectedEntityCard(picked.id);
       showHoverTooltip(picked.id, click.position);
+      openIntelSheet(picked.id);
+      setMobileDrawer(null);
     } else {
       state.selectedEntity = null;
       updateSelectedEntityCard(null);
@@ -805,7 +1077,12 @@ function registerEvents() {
     }
   }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
 
-  window.addEventListener("resize", () => viewer.resize());
+  window.addEventListener("resize", () => {
+    viewer.resize();
+    if (window.innerWidth > 980) {
+      setMobileDrawer(null);
+    }
+  });
 }
 
 function updateScene(currentTime) {
@@ -890,6 +1167,7 @@ function updateSelectedEntityCard(entity) {
       <span>${viewer.clock.shouldAnimate ? "LIVE REPLAY" : "REVIEW MODE"}</span>
     </div>
   `;
+  elements.entityInfo.onclick = () => openIntelSheet(entity);
   updateTrackButtons();
 }
 
