@@ -4,13 +4,14 @@ Panopticon Earth is a globe-first geospatial intelligence experience inspired by
 
 ## What Changed
 
-This repository has been fully reworked from a 2D replay dashboard into a `Cesium + Vite` application with:
+This repository has been reworked from a 2D replay dashboard into a live-focused `Cesium + Vite` application with:
 
 - a fully draggable, zoomable, rotatable `3D Earth`
 - layered simulated `commercial flights`, `military traffic`, `satellites`, `maritime routes`, and `incident zones`
-- timeline-driven replay with click-to-jump event chapters
+- live feed refresh cadence with data assurance/trust indicators
 - scene controls for `home`, `tilt`, `spin`, glow tuning, and visual modes
-- searchable globe navigation plus saved camera bookmarks
+- searchable globe navigation with keyboard result control plus saved camera bookmarks
+- operational legend synced to layer on/off state
 
 ## Project Structure
 
@@ -40,6 +41,8 @@ npm run build
 npm run preview
 ```
 
+For post-change interaction validation, use `SMOKE_CHECKLIST.md`.
+
 ## GitHub Deployment (Pages)
 
 This repo now includes `.github/workflows/deploy-pages.yml`.
@@ -54,11 +57,13 @@ This repo now includes `.github/workflows/deploy-pages.yml`.
 ## Current Capabilities
 
 - direct globe interaction with drag, pan, tilt, and zoom
-- replay timeline controlling all simulated entities
+- scheduled live refresh cycle for integrated feeds
 - click selection and entity tracking
 - multiple basemaps and visual FX modes
 - persistent saved camera views in local storage
 - public geocoding search using OpenStreetMap Nominatim
+- keyboard navigation for search results (`ArrowUp`, `ArrowDown`, `Enter`, `Escape`)
+- trust indicators and operational legend for operator confidence/readability
 
 ## Next Extensions
 
