@@ -167,6 +167,7 @@ initNewsPanel();
 startLocationHud();
 initDraggablePanels();
 initPingCanvas();
+initCinematicUi();
 viewer.scene.requestRender();
 
 function initializeNarrativeState() {
@@ -318,6 +319,7 @@ function cacheElements() {
     bootOverlay:         document.getElementById("boot-overlay"),
     bootProgressFill:    document.getElementById("boot-progress-fill"),
     bootStatus:          document.getElementById("boot-status"),
+    consoleFrame:        document.querySelector(".console-frame"),
     pingCanvas:          document.getElementById("ping-canvas"),
     clickLocPopup:       document.getElementById("click-location-popup"),
     clpClose:            document.getElementById("clp-close"),
@@ -1544,11 +1546,57 @@ function finishBoot() {
   setTimeout(() => {
     overlay.classList.add("boot-fading");
     overlay.style.pointerEvents = "none";
+    document.body.classList.add("boot-complete");
+    pulseConsoleFrame("boot");
     setTimeout(() => {
       overlay.style.display = "none";
       overlay.remove();
     }, 900);
   }, 750);
+}
+
+let _consolePulseTimer = null;
+
+function pulseConsoleFrame(mode = "click") {
+  const frame = elements.consoleFrame;
+  if (!frame) return;
+  frame.classList.remove("console-frame-pulse", "console-frame-boot-pulse", "console-frame-scan-burst");
+  void frame.offsetWidth;
+  frame.classList.add(mode === "boot" ? "console-frame-boot-pulse" : "console-frame-pulse");
+  frame.classList.add("console-frame-scan-burst");
+  if (_consolePulseTimer) window.clearTimeout(_consolePulseTimer);
+  _consolePulseTimer = window.setTimeout(() => {
+    frame.classList.remove("console-frame-pulse", "console-frame-boot-pulse", "console-frame-scan-burst");
+  }, mode === "boot" ? 1800 : 900);
+}
+
+function initCinematicUi() {
+  document.body.classList.add("ui-booting");
+
+  const zoneBindings = [
+    [document.getElementById("panel-layers"), "left"],
+    [document.getElementById("map-legend"), "left"],
+    [document.getElementById("panel-right"), "right"],
+    [document.getElementById("floating-summary"), "center"],
+    [document.getElementById("hud-top"), "top"],
+    [document.getElementById("hud-bottom"), "bottom"],
+    [document.getElementById("news-briefing"), "right"]
+  ];
+
+  zoneBindings.forEach(([node, zone]) => {
+    if (!(node instanceof HTMLElement)) return;
+    node.addEventListener("mouseenter", () => {
+      document.body.dataset.consoleFocus = zone;
+    });
+    node.addEventListener("mouseleave", () => {
+      if (document.body.dataset.consoleFocus === zone) delete document.body.dataset.consoleFocus;
+    });
+  });
+
+  document.querySelectorAll(".hud-action, .panel-btn, .transport-btn, .news-btn, .search-btn").forEach(node => {
+    if (!(node instanceof HTMLElement)) return;
+    node.addEventListener("mouseenter", () => pulseConsoleFrame("hover"));
+  });
 }
 
 function startGlobeSpinDown() {
@@ -2513,6 +2561,7 @@ function registerEvents() {
     pausePassiveSpin(5500);
     const cartesian = clickedCartesian(click.position, picked);
     focusCameraOnCartesian(cartesian);
+    pulseConsoleFrame("click");
 
     // Always spawn a ping ripple at the click screen position
     spawnPing(click.position.x, click.position.y);

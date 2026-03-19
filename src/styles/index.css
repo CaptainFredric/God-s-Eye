@@ -233,11 +233,96 @@ button {
   50% { opacity: 0.9; transform: scale(1.03); }
 }
 
+body.ui-booting #hud-top,
+body.ui-booting #panel-layers,
+body.ui-booting #panel-right,
+body.ui-booting #floating-summary,
+body.ui-booting #map-legend,
+body.ui-booting #hud-bottom,
+body.ui-booting .news-toggle-btn,
+body.ui-booting #location-hud {
+  opacity: 0;
+  transform: translateY(20px) scale(0.985);
+}
+
+body.boot-complete #hud-top,
+body.boot-complete #panel-layers,
+body.boot-complete #panel-right,
+body.boot-complete #floating-summary,
+body.boot-complete #map-legend,
+body.boot-complete #hud-bottom,
+body.boot-complete .news-toggle-btn,
+body.boot-complete #location-hud {
+  opacity: 1;
+}
+
+body.boot-complete #hud-top,
+body.boot-complete #panel-layers,
+body.boot-complete #panel-right,
+body.boot-complete #floating-summary,
+body.boot-complete #map-legend,
+body.boot-complete #hud-bottom,
+body.boot-complete .news-toggle-btn {
+  animation: panelDockIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+body.boot-complete #hud-top { animation-delay: 0.02s; }
+body.boot-complete #panel-layers { animation-delay: 0.08s; }
+body.boot-complete #panel-right { animation-delay: 0.12s; }
+body.boot-complete #floating-summary { animation-delay: 0.18s; }
+body.boot-complete #map-legend { animation-delay: 0.24s; }
+body.boot-complete #hud-bottom { animation-delay: 0.3s; }
+body.boot-complete .news-toggle-btn { animation-delay: 0.34s; }
+
+@keyframes panelDockIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 .console-frame {
   position: absolute;
   inset: 82px 210px 82px 210px;
   z-index: 4;
   pointer-events: none;
+}
+
+.console-frame.console-frame-pulse,
+.console-frame.console-frame-boot-pulse {
+  filter: drop-shadow(0 0 20px rgba(126, 224, 255, 0.18));
+}
+
+.console-frame.console-frame-pulse .console-frame-inner,
+.console-frame.console-frame-boot-pulse .console-frame-inner {
+  animation: framePulse 0.9s ease;
+}
+
+.console-frame.console-frame-boot-pulse .console-frame-inner {
+  animation-duration: 1.6s;
+}
+
+.console-frame.console-frame-scan-burst::before,
+.console-frame.console-frame-scan-burst::after {
+  animation: frameSweepBurst 0.8s ease;
+}
+
+@keyframes framePulse {
+  0% { opacity: 0.7; transform: scale(0.995); }
+  35% { opacity: 1; transform: scale(1.002); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes frameSweepBurst {
+  0% { opacity: 0.1; filter: blur(0); }
+  45% { opacity: 1; filter: blur(0.5px); }
+  100% { opacity: 0.8; filter: blur(0); }
 }
 
 .console-frame::before,
@@ -301,6 +386,21 @@ button {
   box-shadow: 0 0 16px rgba(126, 224, 255, 0.12);
 }
 
+.console-side::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  width: 10px;
+  height: 56px;
+  background: linear-gradient(180deg, transparent, rgba(126, 224, 255, 0.9), transparent);
+  box-shadow: 0 0 18px rgba(126, 224, 255, 0.28);
+  animation: sideRailSweep 3.6s linear infinite;
+}
+
+.console-side-right::after {
+  animation-delay: 1.8s;
+}
+
 .console-side-label {
   position: relative;
   writing-mode: vertical-rl;
@@ -325,6 +425,14 @@ button {
   height: 28px;
 }
 
+.console-side-cell::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background: linear-gradient(180deg, rgba(126, 224, 255, 0.18), transparent 60%);
+  opacity: 0.55;
+}
+
 .console-center-reticle {
   position: absolute;
   left: 50%;
@@ -334,6 +442,17 @@ button {
   transform: translate(-50%, -50%);
   pointer-events: none;
   opacity: 0.34;
+}
+
+.console-center-reticle::after {
+  content: "TRACKING VECTOR";
+  position: absolute;
+  left: 50%;
+  bottom: -20px;
+  transform: translateX(-50%);
+  font: 600 0.52rem "Share Tech Mono", monospace;
+  letter-spacing: 0.18em;
+  color: rgba(126, 224, 255, 0.52);
 }
 
 .reticle-ring,
@@ -366,6 +485,15 @@ button {
   width: 42%;
   height: 42%;
   border-color: rgba(126, 224, 255, 0.34);
+}
+
+.reticle-ring-inner::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border: 1px dashed rgba(126, 224, 255, 0.16);
+  border-radius: 50%;
+  animation: reticleDrift 9s linear infinite;
 }
 
 .reticle-cross-h,
@@ -409,6 +537,25 @@ button {
   justify-content: center;
 }
 
+.console-bottom-dock::before,
+.console-bottom-dock::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 120px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(126, 224, 255, 0.42), transparent);
+}
+
+.console-bottom-dock::before {
+  right: calc(100% + 10px);
+}
+
+.console-bottom-dock::after {
+  left: calc(100% + 10px);
+  transform: rotate(180deg);
+}
+
 .dock-segment,
 .dock-core {
   height: 16px;
@@ -430,6 +577,51 @@ button {
   width: 130px;
   height: 24px;
   background: linear-gradient(180deg, rgba(175, 157, 255, 0.18), rgba(126, 224, 255, 0.06));
+}
+
+.dock-segment,
+.dock-core {
+  position: relative;
+  overflow: hidden;
+}
+
+.dock-segment::before,
+.dock-core::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(126, 224, 255, 0.22), transparent);
+  transform: translateX(-120%);
+  animation: dockSweep 4.4s linear infinite;
+}
+
+.dock-core::before {
+  animation-duration: 3.2s;
+}
+
+@keyframes dockSweep {
+  from { transform: translateX(-120%); }
+  55%, 100% { transform: translateX(140%); }
+}
+
+@keyframes sideRailSweep {
+  from { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  50% { opacity: 0.95; }
+  100% { top: calc(100% - 56px); opacity: 0; }
+}
+
+body[data-console-focus="left"] .console-side-left,
+body[data-console-focus="right"] .console-side-right,
+body[data-console-focus="center"] .console-center-reticle,
+body[data-console-focus="top"] .console-rail-top,
+body[data-console-focus="bottom"] .console-bottom-dock {
+  filter: brightness(1.25) saturate(1.2);
+}
+
+body[data-console-focus="left"] .console-side-left::before,
+body[data-console-focus="right"] .console-side-right::before {
+  box-shadow: 0 0 24px rgba(126, 224, 255, 0.24);
 }
 
 .console-corner,
@@ -3326,6 +3518,18 @@ body.compact-ui .control-group + .control-group {
 @media (max-width: 860px) {
   .console-frame {
     display: none;
+  }
+
+  body.ui-booting #hud-top,
+  body.ui-booting #panel-layers,
+  body.ui-booting #panel-right,
+  body.ui-booting #floating-summary,
+  body.ui-booting #map-legend,
+  body.ui-booting #hud-bottom,
+  body.ui-booting .news-toggle-btn,
+  body.ui-booting #location-hud {
+    opacity: 1;
+    transform: none;
   }
 
   #hud-bottom {
