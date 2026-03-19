@@ -2078,3 +2078,421 @@ body.compact-ui .control-group + .control-group {
     transition: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT INTRO OVERLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  pointer-events: all;
+  isolation: isolate;
+}
+
+.boot-overlay.boot-done {
+  pointer-events: none;
+}
+
+/* Metallic shutters */
+.boot-shutter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  z-index: 2;
+  background: linear-gradient(
+    135deg,
+    #07131f 0%,
+    #0a1f35 18%,
+    #0d2844 30%,
+    #0a1e32 45%,
+    #05111e 60%,
+    #08182a 75%,
+    #04101c 100%
+  );
+  transition: transform 0.9s cubic-bezier(0.76, 0, 0.24, 1);
+}
+
+/* Metallic sheen line on each shutter */
+.boot-shutter::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(126, 224, 255, 0.6) 20%,
+    rgba(175, 157, 255, 0.9) 50%,
+    rgba(126, 224, 255, 0.6) 80%,
+    transparent 100%
+  );
+  box-shadow: 0 0 18px rgba(126, 224, 255, 0.5), 0 0 40px rgba(175, 157, 255, 0.3);
+  animation: shutterSheen 2.4s ease-in-out infinite;
+}
+
+.boot-shutter-top {
+  top: 0;
+}
+
+.boot-shutter-top::after {
+  bottom: 0;
+}
+
+.boot-shutter-bottom {
+  bottom: 0;
+}
+
+.boot-shutter-bottom::after {
+  top: 0;
+}
+
+/* Horizontal embossed grooves */
+.boot-shutter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 11px,
+    rgba(0, 0, 0, 0.18) 11px,
+    rgba(0, 0, 0, 0.18) 12px,
+    rgba(255, 255, 255, 0.03) 12px,
+    rgba(255, 255, 255, 0.03) 13px
+  );
+}
+
+.boot-shutter-top.open {
+  transform: translateY(-100%);
+}
+
+.boot-shutter-bottom.open {
+  transform: translateY(100%);
+}
+
+@keyframes shutterSheen {
+  0%, 100% { opacity: 0.4; transform: translateX(-100%); }
+  50%       { opacity: 1;   transform: translateX(100%); }
+}
+
+/* Center content */
+.boot-core {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  background: radial-gradient(ellipse at 50% 40%, rgba(0, 50, 80, 0.45), transparent 70%);
+}
+
+.boot-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  animation: bootFadeUp 0.8s 0.3s ease both;
+}
+
+.boot-hex {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+}
+
+.boot-hex-svg {
+  width: 100%;
+  height: 100%;
+  animation: bootHexSpin 12s linear infinite;
+  filter: drop-shadow(0 0 18px rgba(0, 230, 255, 0.7)) drop-shadow(0 0 40px rgba(175, 157, 255, 0.4));
+}
+
+@keyframes bootHexSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.boot-hex-pulse {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 230, 255, 0.3);
+  animation: bootHexPulseAnim 1.8s ease-in-out infinite;
+}
+
+@keyframes bootHexPulseAnim {
+  0%, 100% { transform: scale(0.9); opacity: 0.6; }
+  50%      { transform: scale(1.15); opacity: 0; }
+}
+
+.boot-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.boot-kicker {
+  font: 600 0.62rem "Share Tech Mono", monospace;
+  color: rgba(126, 224, 255, 0.6);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.boot-title {
+  font: 900 3.8rem "Rajdhani", system-ui, sans-serif;
+  color: #fff;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #7ee0ff 0%, #af9dff 50%, #ff6d8d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 30px rgba(126, 224, 255, 0.5));
+  animation: bootTitleGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes bootTitleGlow {
+  from { filter: drop-shadow(0 0 20px rgba(126,224,255,0.4)); }
+  to   { filter: drop-shadow(0 0 45px rgba(175,157,255,0.7)); }
+}
+
+.boot-subtitle {
+  font: 500 0.9rem "Rajdhani", system-ui, sans-serif;
+  color: rgba(234, 248, 255, 0.55);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.boot-progress-wrap {
+  width: 420px;
+  max-width: 88vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: center;
+  animation: bootFadeUp 0.8s 0.6s ease both;
+}
+
+.boot-progress-bar {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.boot-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7ee0ff, #af9dff, #ff6d8d);
+  box-shadow: 0 0 12px rgba(126, 224, 255, 0.8);
+  transition: width 0.35s ease;
+}
+
+.boot-status {
+  font: 500 0.68rem "Share Tech Mono", monospace;
+  color: rgba(126, 224, 255, 0.7);
+  letter-spacing: 0.12em;
+  text-align: center;
+  min-height: 1.2em;
+  animation: bootBlink 1.4s ease-in-out infinite;
+}
+
+@keyframes bootBlink {
+  0%, 80%, 100% { opacity: 1; }
+  40% { opacity: 0.4; }
+}
+
+/* Decorative grid lines behind everything */
+.boot-grid-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(rgba(126, 224, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(126, 224, 255, 0.04) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  opacity: 0;
+  animation: bootGridIn 0.6s 0.1s ease both;
+}
+
+@keyframes bootGridIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Animated scan line */
+.boot-scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(126, 224, 255, 0.6), transparent);
+  z-index: 5;
+  animation: bootScanDown 2.2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes bootScanDown {
+  from { top: 0; opacity: 0.8; }
+  to   { top: 100%; opacity: 0; }
+}
+
+@keyframes bootFadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Fade-out whole overlay */
+.boot-overlay.boot-fading {
+  animation: bootOverlayOut 0.7s 0.1s ease both;
+}
+
+@keyframes bootOverlayOut {
+  from { opacity: 1; }
+  to   { opacity: 0; pointer-events: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOCATION CONTEXT HUD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.location-hud {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.65rem 1.25rem 0.6rem;
+  min-width: 260px;
+  max-width: min(520px, 86vw);
+  background: linear-gradient(
+    160deg,
+    rgba(5, 14, 26, 0.94) 0%,
+    rgba(8, 20, 38, 0.9) 100%
+  );
+  border: 1px solid rgba(126, 224, 255, 0.2);
+  border-radius: 16px;
+  backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow:
+    0 0 0 1px rgba(0, 230, 255, 0.06),
+    0 8px 40px rgba(0, 0, 0, 0.55),
+    0 0 60px rgba(0, 100, 180, 0.12);
+  transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  text-align: center;
+}
+
+.location-hud.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(12px);
+}
+
+.location-hud:not(.hidden) {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.loc-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.loc-crosshair {
+  font-size: 1.1rem;
+  color: var(--cyan);
+  opacity: 0.8;
+  animation: locCrosshairSpin 8s linear infinite;
+}
+
+@keyframes locCrosshairSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.loc-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 6px var(--teal);
+  animation: locLivePulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes locLivePulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+.loc-label {
+  font: 700 1rem "Rajdhani", system-ui, sans-serif;
+  color: #fff;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.loc-detail {
+  font: 500 0.72rem "Rajdhani", system-ui, sans-serif;
+  color: rgba(126, 224, 255, 0.75);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.loc-coords {
+  font: 400 0.64rem "Share Tech Mono", monospace;
+  color: rgba(234, 248, 255, 0.5);
+  letter-spacing: 0.05em;
+}
+
+.loc-meta {
+  font: 400 0.62rem "Share Tech Mono", monospace;
+  color: rgba(234, 248, 255, 0.35);
+  letter-spacing: 0.06em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   3D-STYLE MARKER BILLBOARD ENHANCEMENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Cesium billboard labels get some extra depth via CSS filter */
+.cesium-viewer canvas {
+  filter: contrast(1.04) saturate(1.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BOOT REDUCED MOTION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-hex-svg,
+  .boot-scan-line,
+  .boot-shutter::after,
+  .boot-title,
+  .boot-status,
+  .boot-hex-pulse,
+  .loc-crosshair {
+    animation: none !important;
+  }
+  .boot-shutter {
+    transition: none !important;
+  }
+}

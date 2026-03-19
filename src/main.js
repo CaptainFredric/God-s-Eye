@@ -50,6 +50,12 @@ const state = {
   newsTickerPaused:      false,
   newsCategoryTimer:     null,
   newsPanelHovering:     false,
+  newsCategoryPaused:    false,
+  locationHudVisible:    false,
+  locationLastGeocode:   0,
+  locationLastLng:       null,
+  locationLastLat:       null,
+  locationGeocodeTimer:  null,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
   bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
@@ -132,6 +138,7 @@ viewer.camera.setView({
 });
 
 cacheElements();
+startBootIntro();
 initializeNarrativeState();
 applyFxMode(state.fxMode);
 applyFxIntensity();
@@ -157,6 +164,7 @@ startNarrativeTicker();
 scheduleRefresh();
 refreshLiveFeeds();
 initNewsPanel();
+startLocationHud();
 viewer.scene.requestRender();
 
 function initializeNarrativeState() {
@@ -300,6 +308,14 @@ function cacheElements() {
     btnHome:             document.getElementById("btn-home"),
     btnTilt:             document.getElementById("btn-tilt"),
     btnSpin:             document.getElementById("btn-spin"),
+    locationHud:         document.getElementById("location-hud"),
+    locLabel:            document.getElementById("loc-label"),
+    locDetail:           document.getElementById("loc-detail"),
+    locCoords:           document.getElementById("loc-coords"),
+    locMeta:             document.getElementById("loc-meta"),
+    bootOverlay:         document.getElementById("boot-overlay"),
+    bootProgressFill:    document.getElementById("boot-progress-fill"),
+    bootStatus:          document.getElementById("boot-status"),
     liveNewsHeadline:    document.getElementById("live-news-headline"),
     newsBriefing:        document.getElementById("news-briefing"),
     newsCards:           document.getElementById("news-cards"),
@@ -639,9 +655,11 @@ function createTrafficEntities(items, layerId, color, trailTime, pixelSize = 9) 
       point: {
         pixelSize,
         color,
-        outlineColor: Cesium.Color.BLACK.withAlpha(0.5),
-        outlineWidth: 1,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        outlineColor: color.brighten(0.4, new Cesium.Color()).withAlpha(0.85),
+        outlineWidth: layerId === "military" ? 3 : layerId === "satellites" ? 2.5 : 2,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(1.5e5, 1.6, 1.5e7, 0.8),
+        translucencyByDistance: new Cesium.NearFarScalar(5.0e5, 1.0, 2.0e7, 0.5)
       },
       path: {
         show:       true,
@@ -788,9 +806,11 @@ function createIncidents() {
       position: Cesium.Cartesian3.fromDegrees(incident.location.lng, incident.location.lat, 1500),
       billboard: {
         image:          createMarkerSvg("#ff6d8d", incident.label.slice(0, 1)),
-        scale:          0.9,
+        scale:          1.0,
         verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-        disableDepthTestDistance: Number.POSITIVE_INFINITY
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(1.5e5, 1.4, 8.0e6, 0.6),
+        translucencyByDistance: new Cesium.NearFarScalar(1.5e5, 1.0, 2.0e7, 0.3)
       },
       label: {
         text:           incident.label,
@@ -824,7 +844,44 @@ function createIncidents() {
 }
 
 function createMarkerSvg(color, text) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="54" height="64" viewBox="0 0 54 64"><defs><filter id="g"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#g)"><path d="M27 2c12.7 0 23 10.3 23 23 0 16.7-23 37-23 37S4 41.7 4 25C4 12.3 14.3 2 27 2z" fill="${color}" fill-opacity="0.92" stroke="#ffffff" stroke-opacity="0.4"/><text x="27" y="31" text-anchor="middle" font-size="18" font-family="Share Tech Mono, monospace" fill="#04111f">${text}</text></g></svg>`;
+  const uid = `m${Math.random().toString(36).slice(2, 7)}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="72" height="88" viewBox="0 0 72 88">
+  <defs>
+    <filter id="glow-${uid}" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow-${uid}" x="-30%" y="-10%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="${color}" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.6)" flood-opacity="1"/>
+    </filter>
+    <radialGradient id="body-${uid}" cx="38%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="45%" stop-color="${color}" stop-opacity="1"/>
+      <stop offset="100%" stop-color="${color}" stop-opacity="0.75"/>
+    </radialGradient>
+    <radialGradient id="shine-${uid}" cx="35%" cy="25%" r="45%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Drop shadow ellipse -->
+  <ellipse cx="36" cy="84" rx="14" ry="4" fill="rgba(0,0,0,0.35)" filter="url(#shadow-${uid})"/>
+  <!-- Pin body with 3D gradient -->
+  <g filter="url(#glow-${uid})">
+    <path d="M36 3C21.6 3 10 14.6 10 29c0 20 26 56 26 56s26-36 26-56C62 14.6 50.4 3 36 3z"
+      fill="url(#body-${uid})" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+    <!-- Shine highlight -->
+    <path d="M36 3C21.6 3 10 14.6 10 29c0 20 26 56 26 56s26-36 26-56C62 14.6 50.4 3 36 3z"
+      fill="url(#shine-${uid})"/>
+    <!-- Outline ring inside pin -->
+    <circle cx="36" cy="29" r="15" fill="rgba(0,0,0,0.25)" stroke="rgba(255,255,255,0.3)" stroke-width="1.2"/>
+    <!-- Icon letter -->
+    <text x="36" y="35" text-anchor="middle" font-size="16" font-weight="700"
+      font-family="Share Tech Mono, monospace" fill="#ffffff"
+      style="text-shadow: 0 1px 3px rgba(0,0,0,0.8)">${text}</text>
+  </g>
+  </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
@@ -1267,6 +1324,193 @@ function updateFps() {
 }
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOT INTRO CINEMATIC
+// ─────────────────────────────────────────────────────────────────────────────
+const BOOT_STEPS = [
+  { pct:  8, msg: "Initializing sensor array…" },
+  { pct: 20, msg: "Establishing satellite uplink…" },
+  { pct: 35, msg: "Loading geopolitical overlays…" },
+  { pct: 48, msg: "Calibrating ADS-B receivers…" },
+  { pct: 62, msg: "Syncing orbital telemetry…" },
+  { pct: 76, msg: "Decrypting live intelligence feeds…" },
+  { pct: 90, msg: "Rendering tactical globe…" },
+  { pct:100, msg: "● GOD'S EYE ONLINE" },
+];
+
+function startBootIntro() {
+  const overlay    = elements.bootOverlay;
+  const fillEl     = elements.bootProgressFill;
+  const statusEl   = elements.bootStatus;
+  if (!overlay || !fillEl || !statusEl) return;
+
+  // Make sure it's visible
+  overlay.classList.remove("boot-fading");
+  overlay.style.display = "";
+
+  let stepIdx = 0;
+  const STEP_DELAY = 310; // ms per step
+
+  function runStep() {
+    if (stepIdx >= BOOT_STEPS.length) {
+      // All steps done — open shutters then fade out
+      finishBoot();
+      return;
+    }
+    const { pct, msg } = BOOT_STEPS[stepIdx++];
+    if (fillEl)   fillEl.style.width = `${pct}%`;
+    if (statusEl) statusEl.textContent = msg;
+    setTimeout(runStep, STEP_DELAY);
+  }
+
+  // Short initial pause so the shutter fully renders before starting progress
+  setTimeout(runStep, 420);
+}
+
+function finishBoot() {
+  const overlay = elements.bootOverlay;
+  if (!overlay) return;
+
+  // Open the shutters
+  const shutterTop    = overlay.querySelector(".boot-shutter-top");
+  const shutterBottom = overlay.querySelector(".boot-shutter-bottom");
+  if (shutterTop)    shutterTop.classList.add("open");
+  if (shutterBottom) shutterBottom.classList.add("open");
+
+  // After shutters are out, trigger overall fade
+  setTimeout(() => {
+    overlay.classList.add("boot-fading");
+    // Remove overlay from layout after fade completes
+    setTimeout(() => {
+      overlay.style.display = "none";
+    }, 900);
+  }, 750);
+
+  // Kick off globe fast-spin during the reveal
+  startGlobeSpinDown();
+}
+
+function startGlobeSpinDown() {
+  if (!viewer) return;
+  const scene  = viewer.scene;
+  const camera = viewer.camera;
+
+  // Spin rate: radians/second.  ~0.6 rad/s = noticeable fast spin
+  let spinRate   = 0.55;
+  const TARGET   = 0.0;        // end at rest (autoRotate handles slow spin after)
+  const DURATION = 3200;       // ms to decelerate
+  const start    = performance.now();
+
+  function tick() {
+    const now     = performance.now();
+    const elapsed = now - start;
+    const t       = Math.min(elapsed / DURATION, 1);
+    // Ease-out cubic
+    const ease    = 1 - Math.pow(1 - t, 3);
+    spinRate      = 0.55 * (1 - ease);
+
+    camera.rotate(Cesium.Cartesian3.UNIT_Z, spinRate * 0.016);
+
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOCATION CONTEXT HUD
+// ─────────────────────────────────────────────────────────────────────────────
+// Reverse-geocode the camera's center position via Nominatim and display it.
+// Throttled to one request per 3 seconds; cached while camera hasn't moved.
+
+let _locGeocodeTimer = null;
+let _locLastLat      = null;
+let _locLastLng      = null;
+let _locInFlight     = false;
+
+function startLocationHud() {
+  if (!viewer) return;
+  viewer.scene.postRender.addEventListener(onScenePostRender);
+}
+
+function onScenePostRender() {
+  const hud = elements.locationHud;
+  if (!hud) return;
+
+  const carto = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+  const altKm = carto.height / 1000;
+
+  if (altKm > 4500) {
+    if (!hud.classList.contains("hidden")) hud.classList.add("hidden");
+    return;
+  }
+
+  // Show HUD
+  hud.classList.remove("hidden");
+
+  const lat = Cesium.Math.toDegrees(carto.latitude);
+  const lng = Cesium.Math.toDegrees(carto.longitude);
+
+  // Update coords + meta immediately (local, no network)
+  const locCoords = elements.locCoords;
+  const locMeta   = elements.locMeta;
+  if (locCoords) {
+    locCoords.textContent =
+      `${lat >= 0 ? "N" : "S"}${Math.abs(lat).toFixed(4)}°  ` +
+      `${lng >= 0 ? "E" : "W"}${Math.abs(lng).toFixed(4)}°`;
+  }
+  if (locMeta) {
+    locMeta.textContent = `ALT ${altKm.toFixed(0)} km  ·  ZOOM ${altKm < 300 ? "HIGH" : altKm < 1500 ? "MED" : "LOW"}`;
+  }
+
+  // Debounce geocode: only fire if we moved > ~0.12° or 3s passed
+  const moved = _locLastLat === null ||
+    Math.abs(lat - _locLastLat) > 0.12 ||
+    Math.abs(lng - _locLastLng) > 0.12;
+
+  if (moved) {
+    clearTimeout(_locGeocodeTimer);
+    _locGeocodeTimer = setTimeout(() => reverseGeocode(lat, lng), 800);
+  }
+}
+
+async function reverseGeocode(lat, lng) {
+  if (_locInFlight) return;
+  _locInFlight  = true;
+  _locLastLat   = lat;
+  _locLastLng   = lng;
+
+  const label  = elements.locLabel;
+  const detail = elements.locDetail;
+
+  try {
+    const url  = `https://nominatim.openstreetmap.org/reverse?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&format=json`;
+    const resp = await fetch(url, {
+      headers: { "Accept-Language": "en-US,en", "User-Agent": "GodsEye/1.0 intelligence-dashboard" }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const addr = data.address || {};
+
+    const country = addr.country  || "";
+    const state   = addr.state    || addr.county || "";
+    const city    = addr.city     || addr.town   || addr.village || addr.municipality || "";
+    const code    = (addr.country_code || "").toUpperCase();
+
+    // Country flag emoji
+    const flag = code.length === 2
+      ? String.fromCodePoint(...[...code].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
+      : "";
+
+    if (label)  label.textContent  = `${flag}  ${country || "Open Ocean"}`.trim();
+    if (detail) detail.textContent = [city, state].filter(Boolean).join(", ") || "";
+  } catch {
+    if (label)  label.textContent  = "Scanning…";
+    if (detail) detail.textContent = "";
+  } finally {
+    _locInFlight = false;
+  }
+}
 
 function escapeHtml(text) {
   return String(text)

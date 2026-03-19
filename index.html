@@ -14,6 +14,57 @@
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
 </head>
 <body>
+  <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
+  <div id="boot-overlay" class="boot-overlay" aria-hidden="true">
+    <div class="boot-shutter boot-shutter-top"></div>
+    <div class="boot-shutter boot-shutter-bottom"></div>
+    <div class="boot-core">
+      <div class="boot-logo-wrap">
+        <div class="boot-hex">
+          <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" class="boot-hex-svg">
+            <polygon points="60,4 112,32 112,88 60,116 8,88 8,32" fill="none" stroke="url(#bootGrad)" stroke-width="2.5"/>
+            <polygon points="60,18 99,40 99,80 60,102 21,80 21,40" fill="none" stroke="rgba(0,230,255,0.25)" stroke-width="1"/>
+            <circle cx="60" cy="60" r="22" fill="none" stroke="url(#bootGrad)" stroke-width="2"/>
+            <circle cx="60" cy="60" r="10" fill="url(#bootGrad)" opacity="0.7"/>
+            <defs>
+              <linearGradient id="bootGrad" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#7ee0ff"/>
+                <stop offset="50%" stop-color="#af9dff"/>
+                <stop offset="100%" stop-color="#ff6d8d"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="boot-hex-pulse"></div>
+        </div>
+        <div class="boot-text-block">
+          <div class="boot-kicker">PANOPTICON-EARTH // CLASSIFIED</div>
+          <div class="boot-title">GOD'S EYE</div>
+          <div class="boot-subtitle">Global Intelligence Command Center</div>
+        </div>
+      </div>
+      <div class="boot-progress-wrap">
+        <div class="boot-progress-bar">
+          <div class="boot-progress-fill" id="boot-progress-fill"></div>
+        </div>
+        <div class="boot-status" id="boot-status">Initializing sensor array…</div>
+      </div>
+      <div class="boot-grid-lines"></div>
+      <div class="boot-scan-line"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ LOCATION CONTEXT HUD ════════════════════ -->
+  <div id="location-hud" class="location-hud hidden" aria-live="polite" aria-label="Current view location">
+    <div class="loc-head">
+      <span class="loc-crosshair">⊕</span>
+      <span class="loc-live-dot"></span>
+      <span class="loc-label" id="loc-label">Scanning…</span>
+    </div>
+    <div class="loc-detail" id="loc-detail"></div>
+    <div class="loc-coords" id="loc-coords"></div>
+    <div class="loc-meta" id="loc-meta"></div>
+  </div>
+
   <div id="app">
     <div id="cesiumContainer"></div>
 
@@ -222,7 +273,7 @@
         </section>
       </div>
     </aside>
-  </div>
+  </div><!-- /#app -->
 
   <!-- ── Live News Briefing ─────────────────────────────────────────────── -->
   <aside id="news-briefing" class="news-briefing glass-panel hidden" aria-label="Live News Briefing">
