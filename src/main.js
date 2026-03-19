@@ -1914,6 +1914,19 @@ function initNewsPanel() {
     invalidateNewsCache();
     loadNewsCategory(state.newsCategory, true);
   });
+  // Refresh all categories
+  elements.newsRefreshAll = document.getElementById("news-refresh-all");
+  elements.newsRefreshAll?.addEventListener("click", () => {
+    invalidateNewsCache();
+    prefetchAllCategories();
+  });
+  // Pause/play auto-rotation
+  elements.newsRotateToggle = document.getElementById("news-rotate-toggle");
+  elements.newsRotateToggle?.addEventListener("click", () => {
+    const paused = elements.newsRotateToggle.getAttribute("aria-pressed") === "false";
+    elements.newsRotateToggle.setAttribute("aria-pressed", paused ? "true" : "false");
+    state.newsCategoryPaused = !paused;
+  });
 
   elements.liveNewsHeadline?.addEventListener("mouseenter", () => { state.newsTickerPaused = true; });
   elements.liveNewsHeadline?.addEventListener("mouseleave", () => { state.newsTickerPaused = false; });
@@ -2180,7 +2193,7 @@ function startNewsTicker() {
 function startNewsCategoryRotation() {
   if (state.newsCategoryTimer) window.clearInterval(state.newsCategoryTimer);
   state.newsCategoryTimer = window.setInterval(() => {
-    if (!state.newsOpen || state.newsPanelHovering) return;
+    if (!state.newsOpen || state.newsPanelHovering || state.newsCategoryPaused) return;
     rotateToNextNewsCategory();
   }, 22000);
 }
@@ -2237,10 +2250,24 @@ function updateBadge(count) {
   }
 }
 
-function hideBadge() {
-  elements.newsBadge?.classList.add("hidden");
-}
-
+  articles.forEach((article, i) => {
+    const card = buildNewsCard(article, cat, i);
+    card.tabIndex = 0;
+    card.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown" || e.key === "Tab") {
+        e.preventDefault();
+        const next = card.nextElementSibling;
+        if (next) next.focus();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prev = card.previousElementSibling;
+        if (prev) prev.focus();
+      } else if (e.key === "Enter" || e.key === " ") {
+        card.click();
+      }
+    });
+    frag.appendChild(card);
+  });
 function animateRefreshButton(spinning) {
   if (!elements.newsRefreshBtn) return;
   elements.newsRefreshBtn.classList.toggle("spinning", spinning);
