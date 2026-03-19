@@ -278,6 +278,160 @@ button {
   opacity: 0.8;
 }
 
+.console-side {
+  position: absolute;
+  top: 54px;
+  bottom: 54px;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  opacity: 0.88;
+}
+
+.console-side-left { left: -18px; }
+.console-side-right { right: -18px; }
+
+.console-side::before {
+  content: "";
+  position: absolute;
+  inset: 0 13px;
+  background: linear-gradient(180deg, rgba(126, 224, 255, 0.28), rgba(126, 224, 255, 0.06));
+  box-shadow: 0 0 16px rgba(126, 224, 255, 0.12);
+}
+
+.console-side-label {
+  position: relative;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font: 600 0.48rem "Share Tech Mono", monospace;
+  letter-spacing: 0.18em;
+  color: rgba(126, 224, 255, 0.72);
+  margin-top: 8px;
+}
+
+.console-side-cell {
+  position: relative;
+  width: 20px;
+  height: 52px;
+  border: 1px solid rgba(126, 224, 255, 0.22);
+  background: linear-gradient(180deg, rgba(126, 224, 255, 0.16), rgba(126, 224, 255, 0.04));
+  clip-path: polygon(0 8px, 8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px));
+  box-shadow: inset 0 0 12px rgba(126, 224, 255, 0.08);
+}
+
+.console-side-cell.short {
+  height: 28px;
+}
+
+.console-center-reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(46vw, 540px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.34;
+}
+
+.reticle-ring,
+.reticle-cross {
+  position: absolute;
+  display: block;
+}
+
+.reticle-ring {
+  inset: 50%;
+  border-radius: 50%;
+  border: 1px solid rgba(126, 224, 255, 0.22);
+  transform: translate(-50%, -50%);
+}
+
+.reticle-ring-outer {
+  width: 100%;
+  height: 100%;
+  animation: reticleDrift 18s linear infinite;
+}
+
+.reticle-ring-mid {
+  width: 72%;
+  height: 72%;
+  border-color: rgba(175, 157, 255, 0.18);
+  animation: reticleDriftReverse 14s linear infinite;
+}
+
+.reticle-ring-inner {
+  width: 42%;
+  height: 42%;
+  border-color: rgba(126, 224, 255, 0.34);
+}
+
+.reticle-cross-h,
+.reticle-cross-v {
+  left: 50%;
+  top: 50%;
+  background: linear-gradient(90deg, transparent, rgba(126, 224, 255, 0.55), transparent);
+  transform: translate(-50%, -50%);
+}
+
+.reticle-cross-h {
+  width: 72%;
+  height: 1px;
+}
+
+.reticle-cross-v {
+  width: 1px;
+  height: 72%;
+  background: linear-gradient(180deg, transparent, rgba(126, 224, 255, 0.55), transparent);
+}
+
+@keyframes reticleDrift {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+@keyframes reticleDriftReverse {
+  from { transform: translate(-50%, -50%) rotate(360deg); }
+  to { transform: translate(-50%, -50%) rotate(0deg); }
+}
+
+.console-bottom-dock {
+  position: absolute;
+  left: 50%;
+  bottom: -28px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, 56vw);
+  justify-content: center;
+}
+
+.dock-segment,
+.dock-core {
+  height: 16px;
+  border: 1px solid rgba(126, 224, 255, 0.22);
+  background: linear-gradient(180deg, rgba(126, 224, 255, 0.16), rgba(126, 224, 255, 0.04));
+  clip-path: polygon(0 8px, 8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px));
+  box-shadow: 0 0 16px rgba(126, 224, 255, 0.08), inset 0 0 10px rgba(126, 224, 255, 0.08);
+}
+
+.dock-segment {
+  width: 72px;
+}
+
+.dock-segment.wide {
+  width: 118px;
+}
+
+.dock-core {
+  width: 130px;
+  height: 24px;
+  background: linear-gradient(180deg, rgba(175, 157, 255, 0.18), rgba(126, 224, 255, 0.06));
+}
+
 .console-corner,
 .console-rail {
   position: absolute;
@@ -3124,6 +3278,11 @@ body.compact-ui .control-group + .control-group {
 @media (max-width: 1100px) {
   .console-frame {
     inset: 88px 120px 88px 120px;
+  }
+
+  .console-side,
+  .console-bottom-dock {
+    display: none;
   }
 
   #hud-top::before,
