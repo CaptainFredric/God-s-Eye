@@ -326,6 +326,10 @@ function cacheElements() {
     clpRegion:           document.getElementById("clp-region"),
     clpCoordsPopup:      document.getElementById("clp-coords-popup"),
     clpLoading:          document.getElementById("clp-loading"),
+    clickConflictBox:    document.getElementById("click-conflict-box"),
+    ccbClose:            document.getElementById("ccb-close"),
+    ccbTitle:            document.getElementById("ccb-title"),
+    ccbList:             document.getElementById("ccb-list"),
     liveNewsHeadline:    document.getElementById("live-news-headline"),
     newsBriefing:        document.getElementById("news-briefing"),
     newsCards:           document.getElementById("news-cards"),
@@ -1137,20 +1141,155 @@ function pausePassiveSpin(duration = 5000) {
 
 function focusCameraOnCartesian(cartesian, duration = 1.6) {
   if (!cartesian) return;
-  const cg           = Cesium.Cartographic.fromCartesian(cartesian);
-  const targetHeight = clamp(viewer.camera.positionCartographic.height * 0.55, 900000, 5500000);
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromRadians(cg.longitude, cg.latitude, targetHeight),
-    orientation: { heading: viewer.camera.heading, pitch: Cesium.Math.toRadians(-52), roll: 0 },
-    duration
+  const currentHeight = viewer.camera.positionCartographic.height;
+  const desiredPitch  = clamp(viewer.camera.pitch, Cesium.Math.toRadians(-82), Cesium.Math.toRadians(-48));
+  const desiredRange  = clamp(currentHeight * 0.82, 850000, 4800000);
+  viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(cartesian, 1), {
+    duration,
+    offset: new Cesium.HeadingPitchRange(viewer.camera.heading, desiredPitch, desiredRange)
   });
 }
 
 function clickedCartesian(position, picked) {
   if (picked?.id?.position) return picked.id.position.getValue(viewer.clock.currentTime);
-  return viewer.scene.pickPositionSupported
-    ? viewer.scene.pickPosition(position)
-    : viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
+  const precise = viewer.scene.pickPositionSupported ? viewer.scene.pickPosition(position) : null;
+  return precise ?? viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
+}
+
+const DECRYPT_CHARS = "█▓▒░<>/\\|_+-=*#0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function animateDecryptText(element, targetText, duration = 520) {
+  if (!element) return;
+  const finalText = String(targetText ?? "");
+  if (!finalText) {
+    element.textContent = "";
+    element.classList.remove("is-decrypting");
+    return;
+  }
+  const startedAt = performance.now();
+  element.classList.add("is-decrypting");
+
+  function frame(now) {
+    const progress = Math.min((now - startedAt) / duration, 1);
+    const revealCount = Math.floor(finalText.length * progress);
+    let scrambled = "";
+    for (let index = 0; index < finalText.length; index += 1) {
+      const currentChar = finalText[index];
+      if (currentChar === " ") {
+        scrambled += " ";
+        continue;
+      }
+      if (index < revealCount) {
+        scrambled += currentChar;
+        continue;
+      }
+      scrambled += DECRYPT_CHARS[Math.floor(Math.random() * DECRYPT_CHARS.length)];
+    }
+    element.textContent = scrambled;
+    if (progress < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      element.textContent = finalText;
+      element.classList.remove("is-decrypting");
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function computeGeoDistanceKm(latA, lngA, latB, lngB) {
+  const toRadians = value => value * Math.PI / 180;
+  const dLat = toRadians(latB - latA);
+  const dLng = toRadians(lngB - lngA);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(latA)) * Math.cos(toRadians(latB)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function findNearbyConflictIntel(lat, lng) {
+  const alerts = SCENARIO.alerts.map(alert => ({
+    kind: "alert",
+    title: alert.title,
+    summary: getActiveAlertNarrative(alert).summary ?? alert.summary,
+    sourceLabel: getActiveAlertNarrative(alert).sourceLabel ?? alert.sourceLabel,
+    sourceUrl: getActiveAlertNarrative(alert).sourceUrl ?? alert.sourceUrl,
+    distanceKm: computeGeoDistanceKm(lat, lng, alert.location.lat, alert.location.lng),
+    severity: 3,
+    tags: alert.tags ?? []
+  }));
+  const incidents = SCENARIO.incidents.map(incident => ({
+    kind: "incident",
+    title: incident.label,
+    summary: getActiveIncidentNarrative(incident).description ?? incident.description,
+    sourceLabel: getActiveIncidentNarrative(incident).sourceLabel ?? incident.sourceLabel,
+    sourceUrl: getActiveIncidentNarrative(incident).sourceUrl ?? incident.sourceUrl,
+    distanceKm: computeGeoDistanceKm(lat, lng, incident.location.lat, incident.location.lng),
+    severity: 4,
+    tags: incident.tags ?? []
+  }));
+  const combined = [...alerts, ...incidents].sort((left, right) => {
+    if (left.distanceKm !== right.distanceKm) return left.distanceKm - right.distanceKm;
+    return right.severity - left.severity;
+  });
+  const closeMatches = combined.filter(item => item.distanceKm <= 1800).slice(0, 4);
+  if (closeMatches.length) return closeMatches;
+  return combined.filter(item => item.distanceKm <= 3200).slice(0, 3);
+}
+
+function formatDistanceLabel(distanceKm) {
+  return distanceKm >= 1000 ? `${(distanceKm / 1000).toFixed(1)} Mm` : `${Math.round(distanceKm)} km`;
+}
+
+function renderConflictIntel(screenX, screenY, lat, lng, geoContext = {}) {
+  const box = elements.clickConflictBox;
+  if (!box || !elements.ccbList || !elements.ccbTitle) return;
+  const nearby = findNearbyConflictIntel(lat, lng);
+  const areaLabel = [geoContext.city, geoContext.state, geoContext.country].filter(Boolean)[0] || "Selected Area";
+
+  const popupWidth = 276;
+  const boxWidth = 320;
+  const gap = 12;
+  let left = screenX + 18 + popupWidth + gap;
+  let top = clamp(screenY - 84, 16, window.innerHeight - 250);
+  if (left + boxWidth > window.innerWidth - 16) {
+    left = screenX - boxWidth - popupWidth - 24;
+  }
+  if (left < 16) {
+    left = clamp(screenX - boxWidth / 2, 16, window.innerWidth - boxWidth - 16);
+    top = clamp(screenY + 96, 16, window.innerHeight - 250);
+  }
+
+  box.style.left = `${left}px`;
+  box.style.top = `${top}px`;
+  box.classList.remove("hidden");
+  animateDecryptText(elements.ccbTitle, `${areaLabel.toUpperCase()} // CONFLICT RELEVANCE`, 620);
+
+  if (!nearby.length) {
+    elements.ccbList.innerHTML = `
+      <article class="conflict-card quiet">
+        <strong data-decrypt="No active conflict markers nearby">No active conflict markers nearby</strong>
+        <p data-decrypt="No tracked alert or incident nodes are within the local relevance band.">No tracked alert or incident nodes are within the local relevance band.</p>
+      </article>
+    `;
+  } else {
+    elements.ccbList.innerHTML = nearby.map(item => `
+      <article class="conflict-card ${item.kind}">
+        <div class="conflict-card-head">
+          <span class="conflict-kind">${item.kind.toUpperCase()}</span>
+          <span class="conflict-distance">${formatDistanceLabel(item.distanceKm)}</span>
+        </div>
+        <strong data-decrypt="${escapeHtml(item.title)}">${escapeHtml(item.title)}</strong>
+        <p data-decrypt="${escapeHtml(item.summary)}">${escapeHtml(item.summary)}</p>
+        <div class="conflict-card-foot">
+          <span>${escapeHtml(item.sourceLabel || "Live monitor")}</span>
+        </div>
+      </article>
+    `).join("");
+  }
+
+  elements.ccbList.querySelectorAll("[data-decrypt]").forEach((node, index) => {
+    window.setTimeout(() => animateDecryptText(node, node.getAttribute("data-decrypt") || node.textContent, 480), index * 80);
+  });
 }
 
 function getEntityInfo(entity) {
@@ -1643,8 +1782,8 @@ function showClickLocationPopup(screenX, screenY, lat, lng) {
 
   // Position — keep within viewport
   const PAD  = 16;
-  const W    = 260;
-  const H    = 130;
+  const W    = 276;
+  const H    = 196;
   let px = screenX + 18;
   let py = screenY - H / 2;
   if (px + W > window.innerWidth  - PAD) px = screenX - W - 18;
@@ -1656,13 +1795,15 @@ function showClickLocationPopup(screenX, screenY, lat, lng) {
 
   // Reset state
   if (elements.clpFlag)         elements.clpFlag.textContent    = "";
-  if (elements.clpCountry)      elements.clpCountry.textContent = "Scanning…";
-  if (elements.clpRegion)       elements.clpRegion.textContent  = "";
+  if (elements.clpCountry)      elements.clpCountry.textContent = "██████████";
+  if (elements.clpRegion)       elements.clpRegion.textContent  = "▒▒▒▒▒▒▒▒▒▒▒▒";
   if (elements.clpCoordsPopup)  elements.clpCoordsPopup.textContent =
     `${lat >= 0 ? "N" : "S"}${Math.abs(lat).toFixed(4)}°  ` +
     `${lng >= 0 ? "E" : "W"}${Math.abs(lng).toFixed(4)}°`;
   elements.clpLoading?.classList.remove("hidden");
   popup.classList.remove("hidden");
+
+  renderConflictIntel(screenX, screenY, lat, lng);
 
   // Cancel any previous in-flight geocode
   if (_clpGeoTimer) clearTimeout(_clpGeoTimer);
@@ -1690,8 +1831,9 @@ function showClickLocationPopup(screenX, screenY, lat, lng) {
         : "";
 
       if (elements.clpFlag)    elements.clpFlag.textContent    = flag;
-      if (elements.clpCountry) elements.clpCountry.textContent = country;
-      if (elements.clpRegion)  elements.clpRegion.textContent  = [city, state_].filter(Boolean).join(", ");
+      animateDecryptText(elements.clpCountry, country, 540);
+      animateDecryptText(elements.clpRegion, [city, state_].filter(Boolean).join(", ") || "Area match pending", 640);
+      renderConflictIntel(screenX, screenY, lat, lng, { country, state: state_, city });
     } catch { /* ignore */ } finally {
       if (!cancelled) elements.clpLoading?.classList.add("hidden");
     }
@@ -1700,6 +1842,7 @@ function showClickLocationPopup(screenX, screenY, lat, lng) {
 
 function hideClickLocationPopup() {
   elements.clickLocPopup?.classList.add("hidden");
+  elements.clickConflictBox?.classList.add("hidden");
   if (_clpGeoTimer)   clearTimeout(_clpGeoTimer);
   if (_clpGeoCancelFn) _clpGeoCancelFn();
   _clpGeoCancelFn = null;
@@ -2269,6 +2412,7 @@ function registerEvents() {
   elements.btnDensity?.addEventListener("click",         () => { state.compact   = !state.compact;   applyDensityMode();   });
   elements.closeIntelSheet?.addEventListener("click",    closeIntelSheet);
   elements.clpClose?.addEventListener("click",            hideClickLocationPopup);
+  elements.ccbClose?.addEventListener("click",            hideClickLocationPopup);
   elements.mobileBackdrop?.addEventListener("click",     () => { setMobileDrawer(null); closeIntelSheet(); });
   elements.btnMobileLayers?.addEventListener("click",    () => setMobileDrawer("layers"));
   elements.btnMobileControls?.addEventListener("click",  () => setMobileDrawer("controls"));

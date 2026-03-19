@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-Ci_Ouod_.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-C0a8bfPU.css">
+  <script type="module" crossorigin src="./assets/index-CbW-EekD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bktu1lg0.css">
 </head>
 <body>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
@@ -60,12 +60,24 @@
   <!-- ═══════════════════ CLICK LOCATION POPUP ═══════════════════ -->
   <div id="click-location-popup" class="click-location-popup hidden" role="tooltip" aria-live="polite">
     <button class="clp-close" id="clp-close" type="button" title="Dismiss">✕</button>
-    <div class="clp-flag" id="clp-flag"></div>
-    <div class="clp-country" id="clp-country">Scanning…</div>
-    <div class="clp-region" id="clp-region"></div>
+    <div class="clp-grid"></div>
+    <div class="clp-kicker">GEOLOCK // LIVE</div>
+    <div class="clp-flag decrypt-text" id="clp-flag"></div>
+    <div class="clp-country decrypt-text" id="clp-country">Scanning…</div>
+    <div class="clp-region decrypt-text" id="clp-region"></div>
     <div class="clp-coords" id="clp-coords-popup"></div>
     <div class="clp-loading" id="clp-loading"><span class="clp-spinner"></span> Geocoding…</div>
   </div>
+
+  <aside id="click-conflict-box" class="click-conflict-box hidden" aria-live="polite" aria-label="Nearby conflict intelligence">
+    <div class="conflict-box-grid"></div>
+    <div class="conflict-box-head">
+      <span class="conflict-box-kicker">LOCAL CONFLICT WATCH</span>
+      <button class="clp-close" id="ccb-close" type="button" title="Dismiss">✕</button>
+    </div>
+    <div class="conflict-box-title decrypt-text" id="ccb-title">Scanning nearby live incidents…</div>
+    <div class="conflict-box-list" id="ccb-list"></div>
+  </aside>
 
   <!-- Ping ripple (canvas overlay for click effects) -->
   <canvas id="ping-canvas" class="ping-canvas" aria-hidden="true"></canvas>
@@ -84,6 +96,15 @@
 
   <div id="app">
     <div id="cesiumContainer"></div>
+    <div class="console-frame" aria-hidden="true">
+      <div class="console-frame-inner"></div>
+      <span class="console-corner console-corner-tl"></span>
+      <span class="console-corner console-corner-tr"></span>
+      <span class="console-corner console-corner-bl"></span>
+      <span class="console-corner console-corner-br"></span>
+      <span class="console-rail console-rail-top"></span>
+      <span class="console-rail console-rail-bottom"></span>
+    </div>
 
     <header id="hud-top">
       <div class="hud-logo">
