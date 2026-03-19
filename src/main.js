@@ -1353,18 +1353,21 @@ function startBootIntro() {
   const overlay    = elements.bootOverlay;
   const fillEl     = elements.bootProgressFill;
   const statusEl   = elements.bootStatus;
-  if (!overlay || !fillEl || !statusEl) return;
+  if (!overlay || !fillEl || !statusEl) {
+    if (overlay) overlay.style.display = "none";
+    return;
+  }
 
-  // Make sure it's visible
   overlay.classList.remove("boot-fading");
   overlay.style.display = "";
 
   let stepIdx = 0;
-  const STEP_DELAY = 310; // ms per step
+  const STEP_DELAY = 310;
+  const bootTimeout = setTimeout(() => { finishBoot(); }, 15000);
 
   function runStep() {
     if (stepIdx >= BOOT_STEPS.length) {
-      // All steps done — open shutters then fade out
+      clearTimeout(bootTimeout);
       finishBoot();
       return;
     }
@@ -1374,7 +1377,6 @@ function startBootIntro() {
     setTimeout(runStep, STEP_DELAY);
   }
 
-  // Short initial pause so the shutter fully renders before starting progress
   setTimeout(runStep, 420);
 }
 
@@ -1382,13 +1384,11 @@ function finishBoot() {
   const overlay = elements.bootOverlay;
   if (!overlay) return;
 
-  // Open the shutters
   const shutterTop    = overlay.querySelector(".boot-shutter-top");
   const shutterBottom = overlay.querySelector(".boot-shutter-bottom");
   if (shutterTop)    shutterTop.classList.add("open");
   if (shutterBottom) shutterBottom.classList.add("open");
 
-  // First: fly camera to home view so the globe is properly framed
   viewer.camera.flyTo({
     destination: homeView,
     orientation: {
@@ -1398,17 +1398,16 @@ function finishBoot() {
     },
     duration: 1.4,
     complete: () => {
-      // After arriving home, trigger the fast-spin deceleration
       startGlobeSpinDown();
     }
   });
 
-  // After shutters are out, trigger overall fade
   setTimeout(() => {
     overlay.classList.add("boot-fading");
-    // Remove overlay from layout after fade completes
+    overlay.style.pointerEvents = "none";
     setTimeout(() => {
       overlay.style.display = "none";
+      overlay.remove();
     }, 900);
   }, 750);
 }
@@ -1578,17 +1577,22 @@ function initPingCanvas() {
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
   });
-  animatePings();
+  // Don't auto-start animation — wait for first ping
 }
 
 function spawnPing(x, y, color = "rgba(126,224,255,") {
   _pings.push({ x, y, r: 0, maxR: 80, alpha: 1.0, color, born: performance.now() });
-  if (!_pingAnimId) animatePings();
+  if (!_pingAnimId) {
+    _pingAnimId = requestAnimationFrame(animatePings);
+  }
 }
 
 function animatePings() {
   const canvas = elements.pingCanvas;
-  if (!canvas) return;
+  if (!canvas) {
+    _pingAnimId = null;
+    return;
+  }
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1596,7 +1600,10 @@ function animatePings() {
   for (let i = _pings.length - 1; i >= 0; i--) {
     const p = _pings[i];
     const age = (now - p.born) / 900; // 0→1 over 900ms
-    if (age >= 1) { _pings.splice(i, 1); continue; }
+    if (age >= 1) {
+      _pings.splice(i, 1);
+      continue;
+    }
     const ease  = 1 - Math.pow(1 - age, 2);
     const r     = ease * p.maxR;
     const alpha = (1 - age) * 0.75;
