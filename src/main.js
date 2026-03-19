@@ -165,6 +165,8 @@ scheduleRefresh();
 refreshLiveFeeds();
 initNewsPanel();
 startLocationHud();
+initDraggablePanels();
+initPingCanvas();
 viewer.scene.requestRender();
 
 function initializeNarrativeState() {
@@ -316,6 +318,14 @@ function cacheElements() {
     bootOverlay:         document.getElementById("boot-overlay"),
     bootProgressFill:    document.getElementById("boot-progress-fill"),
     bootStatus:          document.getElementById("boot-status"),
+    pingCanvas:          document.getElementById("ping-canvas"),
+    clickLocPopup:       document.getElementById("click-location-popup"),
+    clpClose:            document.getElementById("clp-close"),
+    clpFlag:             document.getElementById("clp-flag"),
+    clpCountry:          document.getElementById("clp-country"),
+    clpRegion:           document.getElementById("clp-region"),
+    clpCoordsPopup:      document.getElementById("clp-coords-popup"),
+    clpLoading:          document.getElementById("clp-loading"),
     liveNewsHeadline:    document.getElementById("live-news-headline"),
     newsBriefing:        document.getElementById("news-briefing"),
     newsCards:           document.getElementById("news-cards"),
@@ -1378,6 +1388,21 @@ function finishBoot() {
   if (shutterTop)    shutterTop.classList.add("open");
   if (shutterBottom) shutterBottom.classList.add("open");
 
+  // First: fly camera to home view so the globe is properly framed
+  viewer.camera.flyTo({
+    destination: homeView,
+    orientation: {
+      heading: SCENARIO.initialView.heading,
+      pitch:   SCENARIO.initialView.pitch,
+      roll:    SCENARIO.initialView.roll
+    },
+    duration: 1.4,
+    complete: () => {
+      // After arriving home, trigger the fast-spin deceleration
+      startGlobeSpinDown();
+    }
+  });
+
   // After shutters are out, trigger overall fade
   setTimeout(() => {
     overlay.classList.add("boot-fading");
@@ -1386,9 +1411,6 @@ function finishBoot() {
       overlay.style.display = "none";
     }, 900);
   }, 750);
-
-  // Kick off globe fast-spin during the reveal
-  startGlobeSpinDown();
 }
 
 function startGlobeSpinDown() {
@@ -1418,8 +1440,264 @@ function startGlobeSpinDown() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LOCATION CONTEXT HUD
+// DRAGGABLE PANELS
 // ─────────────────────────────────────────────────────────────────────────────
+function initDraggablePanels() {
+  const panels = document.querySelectorAll(".draggable-panel");
+
+  // Build a restore strip (hidden by default)
+  let restoreStrip = document.getElementById("panel-restore-strip");
+  if (!restoreStrip) {
+    restoreStrip = document.createElement("div");
+    restoreStrip.id = "panel-restore-strip";
+    restoreStrip.className = "panel-restore-strip";
+    document.body.appendChild(restoreStrip);
+  }
+
+  function refreshRestoreStrip() {
+    restoreStrip.innerHTML = "";
+    document.querySelectorAll(".draggable-panel.panel-hidden").forEach(panel => {
+      const bar   = panel.querySelector(".panel-drag-bar");
+      const label = bar?.querySelector(".drag-label")?.textContent ?? panel.id;
+      const btn   = document.createElement("button");
+      btn.className = "panel-restore-btn";
+      btn.textContent = `⊕ ${label}`;
+      btn.title = `Restore ${label} panel`;
+      btn.addEventListener("click", () => {
+        panel.classList.remove("panel-hidden");
+        // Reset any drag transform back to CSS default
+        panel.style.left = "";
+        panel.style.top  = "";
+        panel.style.right = "";
+        panel.style.bottom = "";
+        refreshRestoreStrip();
+      });
+      restoreStrip.appendChild(btn);
+    });
+  }
+
+  // Close buttons
+  document.querySelectorAll(".panel-close-btn").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      const targetId = btn.dataset.closePanel;
+      const panel    = targetId ? document.getElementById(targetId) : btn.closest(".draggable-panel");
+      if (!panel) return;
+      panel.classList.add("panel-hidden");
+      refreshRestoreStrip();
+    });
+  });
+
+  // Drag behaviour (desktop only)
+  panels.forEach(panel => {
+    const bar = panel.querySelector(".panel-drag-bar");
+    if (!bar) return;
+
+    let startX = 0, startY = 0, origLeft = 0, origTop = 0;
+
+    bar.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+
+      const rect = panel.getBoundingClientRect();
+      startX  = e.clientX;
+      startY  = e.clientY;
+      origLeft = rect.left;
+      origTop  = rect.top;
+
+      // Switch to absolute top/left positioning
+      panel.style.position = "fixed";
+      panel.style.left     = `${origLeft}px`;
+      panel.style.top      = `${origTop}px`;
+      panel.style.right    = "auto";
+      panel.style.bottom   = "auto";
+      panel.style.transform = "none";
+      panel.classList.add("is-dragging");
+
+      function onMove(me) {
+        const dx = me.clientX - startX;
+        const dy = me.clientY - startY;
+        panel.style.left = `${clamp(origLeft + dx, 0, window.innerWidth  - 60)}px`;
+        panel.style.top  = `${clamp(origTop  + dy, 0, window.innerHeight - 40)}px`;
+      }
+
+      function onUp() {
+        panel.classList.remove("is-dragging");
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup",   onUp);
+      }
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup",   onUp);
+    });
+
+    // Touch drag support
+    bar.addEventListener("touchstart", e => {
+      const touch  = e.touches[0];
+      const rect   = panel.getBoundingClientRect();
+      startX  = touch.clientX;
+      startY  = touch.clientY;
+      origLeft = rect.left;
+      origTop  = rect.top;
+      panel.style.position  = "fixed";
+      panel.style.left      = `${origLeft}px`;
+      panel.style.top       = `${origTop}px`;
+      panel.style.right     = "auto";
+      panel.style.bottom    = "auto";
+      panel.style.transform = "none";
+
+      function onTouchMove(te) {
+        const t  = te.touches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        panel.style.left = `${clamp(origLeft + dx, 0, window.innerWidth  - 60)}px`;
+        panel.style.top  = `${clamp(origTop  + dy, 0, window.innerHeight - 40)}px`;
+      }
+      function onTouchEnd() {
+        document.removeEventListener("touchmove", onTouchMove);
+        document.removeEventListener("touchend",  onTouchEnd);
+      }
+      document.addEventListener("touchmove", onTouchMove, { passive: true });
+      document.addEventListener("touchend",  onTouchEnd);
+    }, { passive: true });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PING CANVAS
+// ─────────────────────────────────────────────────────────────────────────────
+let _pingAnimId = null;
+const _pings = [];
+
+function initPingCanvas() {
+  const canvas = elements.pingCanvas;
+  if (!canvas) return;
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  window.addEventListener("resize", () => {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  });
+  animatePings();
+}
+
+function spawnPing(x, y, color = "rgba(126,224,255,") {
+  _pings.push({ x, y, r: 0, maxR: 80, alpha: 1.0, color, born: performance.now() });
+  if (!_pingAnimId) animatePings();
+}
+
+function animatePings() {
+  const canvas = elements.pingCanvas;
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const now = performance.now();
+  for (let i = _pings.length - 1; i >= 0; i--) {
+    const p = _pings[i];
+    const age = (now - p.born) / 900; // 0→1 over 900ms
+    if (age >= 1) { _pings.splice(i, 1); continue; }
+    const ease  = 1 - Math.pow(1 - age, 2);
+    const r     = ease * p.maxR;
+    const alpha = (1 - age) * 0.75;
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `${p.color}${alpha})`;
+    ctx.lineWidth   = 2.5 * (1 - age);
+    ctx.stroke();
+
+    // Inner dot (only first 30%)
+    if (age < 0.3) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5 * (1 - age / 0.3), 0, Math.PI * 2);
+      ctx.fillStyle = `${p.color}${(0.3 - age / 0.3 * 0.3)}`;
+      ctx.fill();
+    }
+  }
+
+  if (_pings.length > 0) {
+    _pingAnimId = requestAnimationFrame(animatePings);
+  } else {
+    _pingAnimId = null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLICK-LOCATION POPUP
+// ─────────────────────────────────────────────────────────────────────────────
+let _clpGeoTimer     = null;
+let _clpGeoCancelFn  = null;
+
+function showClickLocationPopup(screenX, screenY, lat, lng) {
+  const popup = elements.clickLocPopup;
+  if (!popup) return;
+
+  // Position — keep within viewport
+  const PAD  = 16;
+  const W    = 260;
+  const H    = 130;
+  let px = screenX + 18;
+  let py = screenY - H / 2;
+  if (px + W > window.innerWidth  - PAD) px = screenX - W - 18;
+  if (py < PAD)                          py = PAD;
+  if (py + H > window.innerHeight - PAD) py = window.innerHeight - H - PAD;
+
+  popup.style.left = `${px}px`;
+  popup.style.top  = `${py}px`;
+
+  // Reset state
+  if (elements.clpFlag)         elements.clpFlag.textContent    = "";
+  if (elements.clpCountry)      elements.clpCountry.textContent = "Scanning…";
+  if (elements.clpRegion)       elements.clpRegion.textContent  = "";
+  if (elements.clpCoordsPopup)  elements.clpCoordsPopup.textContent =
+    `${lat >= 0 ? "N" : "S"}${Math.abs(lat).toFixed(4)}°  ` +
+    `${lng >= 0 ? "E" : "W"}${Math.abs(lng).toFixed(4)}°`;
+  elements.clpLoading?.classList.remove("hidden");
+  popup.classList.remove("hidden");
+
+  // Cancel any previous in-flight geocode
+  if (_clpGeoTimer) clearTimeout(_clpGeoTimer);
+  if (_clpGeoCancelFn) _clpGeoCancelFn();
+
+  let cancelled = false;
+  _clpGeoCancelFn = () => { cancelled = true; };
+
+  _clpGeoTimer = setTimeout(async () => {
+    try {
+      const url  = `https://nominatim.openstreetmap.org/reverse?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&format=json`;
+      const resp = await fetch(url, {
+        headers: { "Accept-Language": "en-US,en", "User-Agent": "GodsEye/1.0 intelligence-dashboard" }
+      });
+      if (cancelled || !resp.ok) return;
+      const data = await resp.json();
+      if (cancelled) return;
+      const addr    = data.address || {};
+      const country = addr.country  || "Open Ocean";
+      const state_  = addr.state    || addr.county || "";
+      const city    = addr.city     || addr.town   || addr.village || addr.municipality || "";
+      const code    = (addr.country_code || "").toUpperCase();
+      const flag    = code.length === 2
+        ? String.fromCodePoint(...[...code].map(c => 0x1F1E6 - 65 + c.charCodeAt(0)))
+        : "";
+
+      if (elements.clpFlag)    elements.clpFlag.textContent    = flag;
+      if (elements.clpCountry) elements.clpCountry.textContent = country;
+      if (elements.clpRegion)  elements.clpRegion.textContent  = [city, state_].filter(Boolean).join(", ");
+    } catch { /* ignore */ } finally {
+      if (!cancelled) elements.clpLoading?.classList.add("hidden");
+    }
+  }, 120);
+}
+
+function hideClickLocationPopup() {
+  elements.clickLocPopup?.classList.add("hidden");
+  if (_clpGeoTimer)   clearTimeout(_clpGeoTimer);
+  if (_clpGeoCancelFn) _clpGeoCancelFn();
+  _clpGeoCancelFn = null;
+}
+
 // Reverse-geocode the camera's center position via Nominatim and display it.
 // Throttled to one request per 3 seconds; cached while camera hasn't moved.
 
@@ -1983,6 +2261,7 @@ function registerEvents() {
   elements.btnDeclutter?.addEventListener("click",       () => { state.declutter = !state.declutter; applyDeclutterMode(); });
   elements.btnDensity?.addEventListener("click",         () => { state.compact   = !state.compact;   applyDensityMode();   });
   elements.closeIntelSheet?.addEventListener("click",    closeIntelSheet);
+  elements.clpClose?.addEventListener("click",            hideClickLocationPopup);
   elements.mobileBackdrop?.addEventListener("click",     () => { setMobileDrawer(null); closeIntelSheet(); });
   elements.btnMobileLayers?.addEventListener("click",    () => setMobileDrawer("layers"));
   elements.btnMobileControls?.addEventListener("click",  () => setMobileDrawer("controls"));
@@ -2083,16 +2362,31 @@ function registerEvents() {
     pausePassiveSpin(5500);
     const cartesian = clickedCartesian(click.position, picked);
     focusCameraOnCartesian(cartesian);
+
+    // Always spawn a ping ripple at the click screen position
+    spawnPing(click.position.x, click.position.y);
+
     if (Cesium.defined(picked) && picked.id) {
       state.selectedEntity = picked.id;
       updateSelectedEntityCard(picked.id);
       showHoverTooltip(picked.id, click.position);
       openIntelSheet(picked.id);
       setMobileDrawer(null);
+      hideClickLocationPopup();
     } else {
       state.selectedEntity = null;
       updateSelectedEntityCard(null);
       hideHoverTooltip();
+
+      // Show location popup for blank globe clicks
+      if (cartesian) {
+        const cg  = Cesium.Cartographic.fromCartesian(cartesian);
+        const lat = Cesium.Math.toDegrees(cg.latitude);
+        const lng = Cesium.Math.toDegrees(cg.longitude);
+        showClickLocationPopup(click.position.x, click.position.y, lat, lng);
+      } else {
+        hideClickLocationPopup();
+      }
     }
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 

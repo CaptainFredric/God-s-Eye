@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-gKw1lUcz.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CR2qiSI1.css">
+  <script type="module" crossorigin src="./assets/index-C5QgTNhK.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C0a8bfPU.css">
 </head>
 <body>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
@@ -56,6 +56,19 @@
       <div class="boot-scan-line"></div>
     </div>
   </div>
+
+  <!-- ═══════════════════ CLICK LOCATION POPUP ═══════════════════ -->
+  <div id="click-location-popup" class="click-location-popup hidden" role="tooltip" aria-live="polite">
+    <button class="clp-close" id="clp-close" type="button" title="Dismiss">✕</button>
+    <div class="clp-flag" id="clp-flag"></div>
+    <div class="clp-country" id="clp-country">Scanning…</div>
+    <div class="clp-region" id="clp-region"></div>
+    <div class="clp-coords" id="clp-coords-popup"></div>
+    <div class="clp-loading" id="clp-loading"><span class="clp-spinner"></span> Geocoding…</div>
+  </div>
+
+  <!-- Ping ripple (canvas overlay for click effects) -->
+  <canvas id="ping-canvas" class="ping-canvas" aria-hidden="true"></canvas>
 
   <!-- ═══════════════════ LOCATION CONTEXT HUD ════════════════════ -->
   <div id="location-hud" class="location-hud hidden" aria-live="polite" aria-label="Current view location">
@@ -114,7 +127,12 @@
 
     <div id="mobile-backdrop" class="mobile-backdrop hidden"></div>
 
-    <aside id="panel-layers" class="glass-panel">
+    <aside id="panel-layers" class="glass-panel draggable-panel">
+      <div class="panel-drag-bar" data-drag-target="panel-layers">
+        <span class="drag-grip">⠿</span>
+        <span class="drag-label">LAYERS</span>
+        <button class="panel-close-btn" data-close-panel="panel-layers" title="Hide panel" type="button">✕</button>
+      </div>
       <div class="panel-header">
         <h2 class="panel-title">Global Layers</h2>
         <span class="panel-kicker">Browse and filter global context</span>
@@ -142,7 +160,12 @@
       </section>
     </aside>
 
-    <aside id="panel-right" class="glass-panel">
+    <aside id="panel-right" class="glass-panel draggable-panel">
+      <div class="panel-drag-bar" data-drag-target="panel-right">
+        <span class="drag-grip">⠿</span>
+        <span class="drag-label">CONTROLS</span>
+        <button class="panel-close-btn" data-close-panel="panel-right" title="Hide panel" type="button">✕</button>
+      </div>
       <div class="panel-header">
         <h2 class="panel-title">Controls</h2>
         <span class="panel-kicker">View tuning, tracking, and feed status</span>
@@ -211,7 +234,12 @@
       </section>
     </aside>
 
-    <section id="floating-summary" class="glass-panel">
+    <section id="floating-summary" class="glass-panel draggable-panel">
+      <div class="panel-drag-bar" data-drag-target="floating-summary">
+        <span class="drag-grip">⠿</span>
+        <span class="drag-label">STATUS</span>
+        <button class="panel-close-btn" data-close-panel="floating-summary" title="Hide panel" type="button">✕</button>
+      </div>
       <div class="summary-head">
         <span id="summary-stage">LIVE</span>
         <span id="summary-time">--:--:-- UTC</span>
@@ -220,7 +248,12 @@
       <div id="summary-tags" class="summary-tags"></div>
     </section>
 
-    <section id="map-legend" class="glass-panel">
+    <section id="map-legend" class="glass-panel draggable-panel">
+      <div class="panel-drag-bar" data-drag-target="map-legend">
+        <span class="drag-grip">⠿</span>
+        <span class="drag-label">LEGEND</span>
+        <button class="panel-close-btn" data-close-panel="map-legend" title="Hide panel" type="button">✕</button>
+      </div>
       <div class="legend-head">
         <span class="timeline-title">Operational Legend</span>
         <span id="legend-updated" class="live-caption">Layer key online</span>
