@@ -17,8 +17,107 @@ async function loadCesium() {
 
 const UI_STORAGE_KEYS = {
   declutter: "panopticon-earth-declutter",
-  compact:   "panopticon-earth-compact"
+  compact:   "panopticon-earth-compact",
+  panelState:"panopticon-earth-panel-state",
+  layouts:   "panopticon-earth-layouts",
+  onboardingSeen: "panopticon-earth-onboarding-seen"
 };
+
+const PANEL_IDS = ["panel-layers", "panel-right", "floating-summary", "map-legend"];
+
+const CAMERA_PRESETS = [
+  {
+    id: "preset-home",
+    label: "Home",
+    kicker: "Global",
+    destination: {
+      lng: SCENARIO.initialView.lng,
+      lat: SCENARIO.initialView.lat,
+      height: SCENARIO.initialView.height,
+      heading: SCENARIO.initialView.heading,
+      pitch: SCENARIO.initialView.pitch,
+      roll: SCENARIO.initialView.roll
+    }
+  },
+  { id: "preset-gulf", label: "Gulf Ops", kicker: "AOI", destination: DEFAULT_BOOKMARKS[0].destination, regionFocus: "Gulf Ops" },
+  { id: "preset-europe", label: "Europe Arc", kicker: "Air", destination: DEFAULT_BOOKMARKS[1].destination, regionFocus: "Europe Arc" },
+  { id: "preset-pacific", label: "Pacific Watch", kicker: "Nav", destination: DEFAULT_BOOKMARKS[2].destination, regionFocus: "Pacific Watch" },
+  {
+    id: "preset-theater",
+    label: "Theater Core",
+    kicker: "Signal",
+    destination: { lng: 51.4, lat: 35.6, height: 2800000, heading: 0.22, pitch: -0.98, roll: 0 },
+    regionFocus: "Theater Core"
+  }
+];
+
+const SYSTEM_BOOKMARK_IDS = new Set(DEFAULT_BOOKMARKS.map(bookmark => bookmark.id));
+
+const MISSION_GUIDE_STEPS = [
+  {
+    kicker: "Why It Exists",
+    title: "A global command console, not just a globe",
+    lead: "God's Eye is built for fast situational awareness: scan the world, jump to pressure points, inspect specific assets, and turn raw motion into a usable brief.",
+    sections: [
+      { title: "Best For", items: ["Crisis monitoring and geopolitical watch", "Explaining world events with spatial context", "Portfolio/demo storytelling for an intelligence-style interface"] },
+      { title: "Core Loop", items: ["Find a hotspot or track", "Focus the camera", "Inspect the object or region", "Save the view for later"] }
+    ],
+    actions: [
+      { id: "hotspot", label: "Jump to a Hotspot" },
+      { id: "brief", label: "Generate Global Brief" }
+    ]
+  },
+  {
+    kicker: "How To Start",
+    title: "Three good first moves",
+    lead: "If you are opening the site for the first time, these actions give you the fastest feel for what the dashboard can do.",
+    sections: [
+      { title: "Try This", items: ["Use search to jump to a country, city, alert, or saved view", "Press Next Hotspot to cycle through active regions", "Click any object on the globe to inspect it in context"] }
+    ],
+    actions: [
+      { id: "search-gulf", label: "Search Gulf" },
+      { id: "random-track", label: "Inspect Random Track" }
+    ]
+  },
+  {
+    kicker: "Daily Workflow",
+    title: "Work like an analyst",
+    lead: "A useful rhythm is: search or jump, narrow the scene, open intel, then save the state as a repeatable operating layout.",
+    sections: [
+      { title: "Recommended Flow", items: ["Search for a theater or click an alert", "Use Focus or Compact mode to reduce noise", "Open Intel on the selected object", "Save the layout once the console is arranged your way"] },
+      { title: "Operations Desk", items: ["Next Hotspot steps through live regions", "Random Track surfaces traffic you may have missed", "Brief Focus turns the current state into a readable summary"] }
+    ],
+    actions: [
+      { id: "intel", label: "Open Intel For Selection" },
+      { id: "save-layout", label: "Save Current Layout" }
+    ]
+  },
+  {
+    kicker: "Vision",
+    title: "How people can actually use this",
+    lead: "The strongest version of God's Eye is a cinematic spatial briefing tool for curiosity, investigation, and storytelling.",
+    sections: [
+      { title: "Use Cases", items: ["Students and researchers can connect headlines to geography", "Journalists and creators can move from article to theater map instantly", "Recruiters and visitors can experience your systems thinking through a hands-on product"] },
+      { title: "Long-Term Direction", items: ["Scenario playlists and mission tasks", "Shareable saved views for specific events", "Focused story modes that guide users through conflicts, routes, and anomalies"] }
+    ],
+    actions: [
+      { id: "tour", label: "Start Alert Tour" },
+      { id: "open-news", label: "Open Live News" }
+    ]
+  },
+  {
+    kicker: "Make It Yours",
+    title: "Personalize the command center",
+    lead: "Once you know your preferred workflow, customize the console so returning visitors land in a space that feels deliberate and clean.",
+    sections: [
+      { title: "Customization", items: ["Toggle layers depending on whether you care about aircraft, satellites, maritime, or incidents", "Save views for recurring theaters", "Use saved layouts for different modes like briefing, monitoring, or storytelling"] }
+    ],
+    actions: [
+      { id: "save-view", label: "Save Current View" },
+      { id: "home", label: "Reset To Home" }
+    ]
+  }
+];
 
 const state = {
   selectedEntity:        null,
@@ -27,9 +126,15 @@ const state = {
   spinning:              true,
   spinPausedUntil:       0,
   activeDrawer:          null,
+  opsHotspotIndex:       0,
+  opsTourTimer:          null,
+  onboardingSeen:        loadJson(UI_STORAGE_KEYS.onboardingSeen, false),
+  onboardingStep:        0,
   intelSheetOpen:        false,
   declutter:             loadJson(UI_STORAGE_KEYS.declutter, false),
   compact:               loadJson(UI_STORAGE_KEYS.compact, false),
+  panelState:            loadJson(UI_STORAGE_KEYS.panelState, createDefaultPanelState()),
+  savedLayouts:          loadJson(UI_STORAGE_KEYS.layouts, []),
   tiltMode:              false,
   regionFocus:           null,
   searchAbortController: null,
@@ -58,7 +163,7 @@ const state = {
   locationGeocodeTimer:  null,
   basemapId:             loadJson(STORAGE_KEYS.basemap, BASEMAPS[0].id),
   fxMode:                loadJson(STORAGE_KEYS.fxMode, FX_MODES[0].id),
-  bookmarks:             loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS),
+  bookmarks:             normalizeBookmarks(loadJson(STORAGE_KEYS.bookmarks, DEFAULT_BOOKMARKS)),
   layers:                loadJson(STORAGE_KEYS.layers, Object.fromEntries(LAYERS.map(l => [l.id, l.enabled]))),
   refreshIntervalSec:    90,
   fxIntensity:           58,
@@ -77,6 +182,7 @@ const state = {
 };
 
 const elements = {};
+let refreshPanelRestoreStrip = () => {};
 const dynamic = {
   trails:      [],
   zones:       [],
@@ -149,13 +255,16 @@ renderMetricCluster();
 renderBasemapButtons();
 renderLayerToggles();
 renderLegend();
+renderCameraPresets();
 renderBookmarks();
+renderSavedLayouts();
 renderFxButtons();
 installBasemap(state.basemapId);
 seedScene();
 renderFeedStatus();
 renderTrustIndicators();
 registerEvents();
+updateOperationsControls();
 elements.btnSpin.classList.toggle("active", state.spinning);
 startHudClock();
 startWallClock();
@@ -246,9 +355,13 @@ function cacheElements() {
     metricCluster:       document.getElementById("metric-cluster"),
     basemapButtons:      document.getElementById("basemap-buttons"),
     layerToggles:        document.getElementById("layer-toggles"),
+    cameraPresets:       document.getElementById("camera-presets"),
     bookmarkList:        document.getElementById("bookmark-list"),
     saveBookmark:        document.getElementById("save-bookmark"),
     clearBookmarks:      document.getElementById("clear-bookmarks"),
+    layoutList:          document.getElementById("layout-list"),
+    saveLayout:          document.getElementById("save-layout"),
+    clearLayouts:        document.getElementById("clear-layouts"),
     fxModeButtons:       document.getElementById("fx-mode-buttons"),
     fxIntensity:         document.getElementById("fx-intensity"),
     fxIntensityValue:    document.getElementById("fx-intensity-value"),
@@ -260,6 +373,15 @@ function cacheElements() {
     trackSelected:       document.getElementById("track-selected"),
     releaseTrack:        document.getElementById("release-track"),
     eventRail:           document.getElementById("event-rail"),
+    opsNextHotspot:      document.getElementById("ops-next-hotspot"),
+    opsRandomTrack:      document.getElementById("ops-random-track"),
+    opsOpenIntel:        document.getElementById("ops-open-intel"),
+    opsBriefFocus:       document.getElementById("ops-brief-focus"),
+    opsTourToggle:       document.getElementById("ops-tour-toggle"),
+    opsBrief:            document.getElementById("ops-brief"),
+    opsBriefTitle:       document.getElementById("ops-brief-title"),
+    opsBriefCopy:        document.getElementById("ops-brief-copy"),
+    opsBriefMeta:        document.getElementById("ops-brief-meta"),
     summaryStage:        document.getElementById("summary-stage"),
     summaryTime:         document.getElementById("summary-time"),
     summaryCopy:         document.getElementById("summary-copy"),
@@ -306,6 +428,7 @@ function cacheElements() {
     hudFps:              document.getElementById("hud-fps"),
     hudCamera:           document.getElementById("hud-camera"),
     hudStatusText:       document.getElementById("hud-status-text"),
+    btnGuide:            document.getElementById("btn-guide"),
     btnDeclutter:        document.getElementById("btn-declutter"),
     btnDensity:          document.getElementById("btn-density"),
     btnHome:             document.getElementById("btn-home"),
@@ -332,6 +455,15 @@ function cacheElements() {
     ccbClose:            document.getElementById("ccb-close"),
     ccbTitle:            document.getElementById("ccb-title"),
     ccbList:             document.getElementById("ccb-list"),
+    missionGuide:        document.getElementById("mission-guide"),
+    missionGuideKicker:  document.getElementById("mission-guide-kicker"),
+    missionGuideTitle:   document.getElementById("mission-guide-title"),
+    missionGuideProgress:document.getElementById("mission-guide-progress"),
+    missionGuideBody:    document.getElementById("mission-guide-body"),
+    missionGuideClose:   document.getElementById("mission-guide-close"),
+    missionGuideSkip:    document.getElementById("mission-guide-skip"),
+    missionGuidePrev:    document.getElementById("mission-guide-prev"),
+    missionGuideNext:    document.getElementById("mission-guide-next"),
     liveNewsHeadline:    document.getElementById("live-news-headline"),
     newsBriefing:        document.getElementById("news-briefing"),
     newsCards:           document.getElementById("news-cards"),
@@ -358,6 +490,334 @@ function loadJson(key, fallback) {
 
 function saveJson(key, value) {
   try { window.localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
+function normalizeBookmarks(bookmarks) {
+  const source = Array.isArray(bookmarks) && bookmarks.length ? bookmarks : DEFAULT_BOOKMARKS;
+  return source.map(bookmark => ({
+    ...bookmark,
+    system: bookmark.system ?? SYSTEM_BOOKMARK_IDS.has(bookmark.id)
+  }));
+}
+
+function createDefaultPanelState() {
+  return Object.fromEntries(PANEL_IDS.map(id => [id, { hidden: false, minimized: false }]));
+}
+
+function normalizePanelState(panelState) {
+  return PANEL_IDS.reduce((accumulator, id) => {
+    const current = panelState?.[id] ?? {};
+    accumulator[id] = {
+      hidden: !!current.hidden,
+      minimized: !!current.minimized
+    };
+    return accumulator;
+  }, {});
+}
+
+function savePanelState() {
+  state.panelState = normalizePanelState(state.panelState);
+  saveJson(UI_STORAGE_KEYS.panelState, state.panelState);
+}
+
+function getPanelState(panelId) {
+  state.panelState[panelId] ??= { hidden: false, minimized: false };
+  return state.panelState[panelId];
+}
+
+function getManagedPanel(panelId) {
+  return document.getElementById(panelId);
+}
+
+function setPanelHidden(panelId, hidden) {
+  const panel = getManagedPanel(panelId);
+  if (!panel) return;
+  getPanelState(panelId).hidden = hidden;
+  panel.classList.toggle("panel-hidden", hidden);
+  savePanelState();
+}
+
+function setPanelMinimized(panelId, minimized) {
+  const panel = getManagedPanel(panelId);
+  if (!panel) return;
+  getPanelState(panelId).minimized = minimized;
+  panel.classList.toggle("panel-minimized", minimized);
+  const button = panel.querySelector(`[data-minimize-panel="${panelId}"]`);
+  if (button) button.textContent = minimized ? "+" : "—";
+  savePanelState();
+}
+
+function applyStoredPanelState() {
+  state.panelState = normalizePanelState(state.panelState);
+  PANEL_IDS.forEach(panelId => {
+    const panel = getManagedPanel(panelId);
+    const current = getPanelState(panelId);
+    if (!panel) return;
+    panel.classList.toggle("panel-hidden", current.hidden);
+    panel.classList.toggle("panel-minimized", current.minimized);
+    const button = panel.querySelector(`[data-minimize-panel="${panelId}"]`);
+    if (button) button.textContent = current.minimized ? "+" : "—";
+  });
+  refreshPanelRestoreStrip();
+}
+
+function captureCameraDestination() {
+  const cg = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+  return {
+    lng: Cesium.Math.toDegrees(cg.longitude),
+    lat: Cesium.Math.toDegrees(cg.latitude),
+    height: cg.height,
+    heading: viewer.camera.heading,
+    pitch: viewer.camera.pitch,
+    roll: viewer.camera.roll
+  };
+}
+
+function flyToDestination(destination, complete, duration = 1.8) {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(destination.lng, destination.lat, destination.height),
+    orientation: {
+      heading: destination.heading,
+      pitch: destination.pitch,
+      roll: destination.roll
+    },
+    duration,
+    easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
+    complete
+  });
+}
+
+function renderCameraPresets() {
+  if (!elements.cameraPresets) return;
+  elements.cameraPresets.innerHTML = CAMERA_PRESETS.map(preset => `
+    <button type="button" class="camera-preset-btn" data-preset-id="${preset.id}">
+      <span>${preset.label}</span>
+      <small>${preset.kicker}</small>
+    </button>
+  `).join("");
+  elements.cameraPresets.querySelectorAll(".camera-preset-btn").forEach(button => {
+    button.addEventListener("click", () => {
+      const preset = CAMERA_PRESETS.find(item => item.id === button.dataset.presetId);
+      if (!preset) return;
+      state.regionFocus = preset.regionFocus ?? null;
+      flyToDestination(preset.destination, () => {
+        if (preset.regionFocus) applyRegionalContext(preset.regionFocus, preset.destination.lng, preset.destination.lat);
+      }, 2.1);
+    });
+  });
+}
+
+function captureLayoutSnapshot(name) {
+  return {
+    id: `layout-${Date.now()}`,
+    name,
+    savedAt: Date.now(),
+    panelState: normalizePanelState(state.panelState),
+    panelPositions: Object.fromEntries(PANEL_IDS.map(id => {
+      const panel = getManagedPanel(id);
+      return [id, panel ? {
+        position: panel.style.position || "",
+        left: panel.style.left || "",
+        top: panel.style.top || "",
+        right: panel.style.right || "",
+        bottom: panel.style.bottom || "",
+        transform: panel.style.transform || ""
+      } : {}];
+    })),
+    camera: captureCameraDestination(),
+    ui: {
+      declutter: state.declutter,
+      compact: state.compact,
+      basemapId: state.basemapId,
+      fxMode: state.fxMode
+    }
+  };
+}
+
+function saveCurrentLayout() {
+  const layout = captureLayoutSnapshot(`Layout ${state.savedLayouts.length + 1}`);
+  state.savedLayouts = [layout, ...state.savedLayouts].slice(0, 8);
+  saveJson(UI_STORAGE_KEYS.layouts, state.savedLayouts);
+  renderSavedLayouts();
+}
+
+function applyLayout(layoutId) {
+  const layout = state.savedLayouts.find(item => item.id === layoutId);
+  if (!layout) return;
+  state.panelState = normalizePanelState(layout.panelState);
+  PANEL_IDS.forEach(id => {
+    const panel = getManagedPanel(id);
+    const pos = layout.panelPositions?.[id];
+    if (!panel || !pos) return;
+    panel.style.position = pos.position || "";
+    panel.style.left = pos.left || "";
+    panel.style.top = pos.top || "";
+    panel.style.right = pos.right || "";
+    panel.style.bottom = pos.bottom || "";
+    panel.style.transform = pos.transform || "";
+  });
+  applyStoredPanelState();
+  state.declutter = !!layout.ui?.declutter;
+  state.compact = !!layout.ui?.compact;
+  applyDeclutterMode();
+  applyDensityMode();
+  if (layout.ui?.basemapId) installBasemap(layout.ui.basemapId);
+  if (layout.ui?.fxMode) {
+    state.fxMode = layout.ui.fxMode;
+    applyFxMode(state.fxMode);
+    renderFxButtons();
+  }
+  if (layout.camera) flyToDestination(layout.camera, undefined, 2.2);
+}
+
+function removeLayout(layoutId) {
+  state.savedLayouts = state.savedLayouts.filter(item => item.id !== layoutId);
+  saveJson(UI_STORAGE_KEYS.layouts, state.savedLayouts);
+  renderSavedLayouts();
+}
+
+function renderSavedLayouts() {
+  if (!elements.layoutList) return;
+  if (!state.savedLayouts.length) {
+    elements.layoutList.innerHTML = `<div class="layout-empty">No saved layouts yet.</div>`;
+    return;
+  }
+  elements.layoutList.innerHTML = state.savedLayouts.map(layout => `
+    <div class="layout-item">
+      <button type="button" class="layout-launch" data-layout-id="${layout.id}">
+        <span>${layout.name}</span>
+        <small>${new Date(layout.savedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small>
+      </button>
+      <button type="button" class="layout-remove" data-layout-remove="${layout.id}">✕</button>
+    </div>
+  `).join("");
+  elements.layoutList.querySelectorAll(".layout-launch").forEach(button => {
+    button.addEventListener("click", () => applyLayout(button.dataset.layoutId));
+  });
+  elements.layoutList.querySelectorAll(".layout-remove").forEach(button => {
+    button.addEventListener("click", () => removeLayout(button.dataset.layoutRemove));
+  });
+}
+
+function renderMissionGuide() {
+  if (!elements.missionGuideBody || !elements.missionGuideProgress) return;
+  const step = MISSION_GUIDE_STEPS[state.onboardingStep] ?? MISSION_GUIDE_STEPS[0];
+  if (elements.missionGuideKicker) elements.missionGuideKicker.textContent = step.kicker;
+  if (elements.missionGuideTitle) elements.missionGuideTitle.textContent = step.title;
+
+  elements.missionGuideProgress.innerHTML = MISSION_GUIDE_STEPS.map((item, index) => `
+    <button type="button" class="mission-guide-dot${index === state.onboardingStep ? " active" : ""}" data-guide-step="${index}" aria-label="Go to step ${index + 1}: ${escapeHtml(item.title)}"></button>
+  `).join("");
+
+  elements.missionGuideBody.innerHTML = `
+    <p class="mission-guide-lead">${step.lead}</p>
+    <div class="mission-guide-sections">
+      ${step.sections.map(section => `
+        <section class="mission-guide-section">
+          <h3>${section.title}</h3>
+          <ul>
+            ${section.items.map(item => `<li>${item}</li>`).join("")}
+          </ul>
+        </section>
+      `).join("")}
+    </div>
+    <div class="mission-guide-actions">
+      ${step.actions.map(action => `<button type="button" class="panel-btn mission-guide-action" data-guide-action="${action.id}">${action.label}</button>`).join("")}
+    </div>
+  `;
+
+  elements.missionGuideBody.querySelectorAll("[data-guide-action]").forEach(button => {
+    button.addEventListener("click", () => executeMissionGuideAction(button.dataset.guideAction));
+  });
+  elements.missionGuideProgress.querySelectorAll("[data-guide-step]").forEach(button => {
+    button.addEventListener("click", () => {
+      state.onboardingStep = Number(button.dataset.guideStep) || 0;
+      renderMissionGuide();
+    });
+  });
+
+  if (elements.missionGuidePrev) elements.missionGuidePrev.disabled = state.onboardingStep === 0;
+  if (elements.missionGuideNext) {
+    elements.missionGuideNext.textContent = state.onboardingStep === MISSION_GUIDE_STEPS.length - 1 ? "Finish" : "Next";
+  }
+}
+
+function openMissionGuide(step = 0) {
+  if (!elements.missionGuide) return;
+  state.onboardingStep = clamp(step, 0, MISSION_GUIDE_STEPS.length - 1);
+  renderMissionGuide();
+  elements.missionGuide.classList.remove("hidden");
+  elements.missionGuide.setAttribute("aria-hidden", "false");
+  document.body.classList.add("mission-guide-open");
+}
+
+function closeMissionGuide(markSeen = true) {
+  if (!elements.missionGuide) return;
+  elements.missionGuide.classList.add("hidden");
+  elements.missionGuide.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("mission-guide-open");
+  if (markSeen) {
+    state.onboardingSeen = true;
+    saveJson(UI_STORAGE_KEYS.onboardingSeen, true);
+  }
+}
+
+function stepMissionGuide(direction) {
+  const nextStep = state.onboardingStep + direction;
+  if (nextStep >= MISSION_GUIDE_STEPS.length) {
+    closeMissionGuide(true);
+    return;
+  }
+  state.onboardingStep = clamp(nextStep, 0, MISSION_GUIDE_STEPS.length - 1);
+  renderMissionGuide();
+}
+
+function executeMissionGuideAction(actionId) {
+  if (!actionId) return;
+  switch (actionId) {
+    case "hotspot":
+      focusNextHotspot();
+      break;
+    case "brief":
+      createFocusBrief();
+      break;
+    case "search-gulf":
+      if (elements.searchInput) elements.searchInput.value = "Gulf";
+      runSearch("Gulf");
+      break;
+    case "random-track":
+      focusRandomTrack();
+      break;
+    case "intel":
+      if (state.selectedEntity) openIntelSheet(state.selectedEntity);
+      else setOpsBrief("No Selection Yet", "Pick or jump to a track first, then open the intel drawer for deeper context.", "Selection required");
+      break;
+    case "save-layout":
+      saveCurrentLayout();
+      break;
+    case "tour":
+      if (!state.opsTourTimer) toggleAlertTour();
+      break;
+    case "open-news":
+      openNewsPanel();
+      break;
+    case "save-view":
+      saveCurrentBookmark();
+      break;
+    case "home":
+      flyToDestination({
+        lng: SCENARIO.initialView.lng,
+        lat: SCENARIO.initialView.lat,
+        height: SCENARIO.initialView.height,
+        heading: SCENARIO.initialView.heading,
+        pitch: SCENARIO.initialView.pitch,
+        roll: SCENARIO.initialView.roll
+      }, undefined, 1.8);
+      break;
+    default:
+      return;
+  }
+  closeMissionGuide(false);
 }
 
 function nowJulian() {
@@ -539,9 +999,16 @@ function renderBookmarks() {
   state.bookmarks.forEach(bookmark => {
     const row = document.createElement("div");
     row.className = "bookmark-item";
-    row.innerHTML = `<button type="button">${bookmark.label}</button><button type="button" data-remove="${bookmark.id}">\u2715</button>`;
+    const removable = !bookmark.system;
+    row.innerHTML = `
+      <button type="button" class="bookmark-launch">
+        <span>${bookmark.label}</span>
+        <small>${bookmark.system ? "SYSTEM PRESET" : "SAVED VIEW"}</small>
+      </button>
+      ${removable ? `<button type="button" data-remove="${bookmark.id}">✕</button>` : `<span class="bookmark-badge">SYS</span>`}
+    `;
     row.firstElementChild.addEventListener("click", () => flyToBookmark(bookmark));
-    row.lastElementChild.addEventListener("click",  () => removeBookmark(bookmark.id));
+    if (removable) row.lastElementChild.addEventListener("click", () => removeBookmark(bookmark.id));
     elements.bookmarkList.appendChild(row);
   });
 }
@@ -575,15 +1042,7 @@ function renderEventRail(animate = false) {
       btn.type = "button";
       btn.className = "event-item";
       btn.dataset.alertId = alert.id;
-      btn.addEventListener("click", () => {
-        const activeNarrative = getActiveAlertNarrative(alert);
-        const activeTitle = activeNarrative.title ?? alert.title;
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(alert.location.lng, alert.location.lat, 2600000),
-          duration: 1.8,
-          complete: () => applyRegionalContext(activeTitle, alert.location.lng, alert.location.lat)
-        });
-      });
+      btn.addEventListener("click", () => focusAlert(alert));
       elements.eventRail.appendChild(btn);
     }
 
@@ -614,6 +1073,116 @@ function renderEventRail(animate = false) {
       btn.classList.add("updating");
     }
   });
+}
+
+function setOpsBrief(title, copy, meta = "Interactive tasking tools online") {
+  if (elements.opsBriefTitle) elements.opsBriefTitle.textContent = title;
+  if (elements.opsBriefCopy) elements.opsBriefCopy.textContent = copy;
+  if (elements.opsBriefMeta) elements.opsBriefMeta.textContent = meta;
+  if (elements.opsBrief) {
+    elements.opsBrief.classList.remove("is-updating");
+    void elements.opsBrief.offsetWidth;
+    elements.opsBrief.classList.add("is-updating");
+  }
+}
+
+function updateOperationsControls() {
+  if (elements.opsOpenIntel) elements.opsOpenIntel.disabled = !state.selectedEntity;
+  if (elements.opsTourToggle) {
+    const active = !!state.opsTourTimer;
+    elements.opsTourToggle.classList.toggle("active", active);
+    elements.opsTourToggle.textContent = active ? "Stop Tour" : "Tour Alerts";
+  }
+}
+
+function focusAlert(alert) {
+  if (!alert) return;
+  pausePassiveSpin(7000);
+  const activeNarrative = getActiveAlertNarrative(alert);
+  const activeTitle = activeNarrative.title ?? alert.title;
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(alert.location.lng, alert.location.lat, 2600000),
+    duration: 1.8,
+    complete: () => applyRegionalContext(activeTitle, alert.location.lng, alert.location.lat)
+  });
+  setOpsBrief(
+    activeTitle,
+    activeNarrative.summary ?? alert.summary,
+    `${alert.region} · ${activeNarrative.publishedAt ?? "Live rolling brief"}`
+  );
+}
+
+function focusNextHotspot() {
+  if (!SCENARIO.alerts.length) return;
+  const alert = SCENARIO.alerts[state.opsHotspotIndex % SCENARIO.alerts.length];
+  state.opsHotspotIndex = (state.opsHotspotIndex + 1) % SCENARIO.alerts.length;
+  focusAlert(alert);
+}
+
+function focusRandomTrack() {
+  const candidates = [...dynamic.liveTraffic, ...dynamic.traffic].filter(entity => entity?.show !== false && entity?.position);
+  if (!candidates.length) {
+    setOpsBrief("No Tracks Available", "There are no active track entities available to inspect right now.", "Awaiting feed refresh");
+    return;
+  }
+  const entity = candidates[Math.floor(Math.random() * candidates.length)];
+  const info = getEntityInfo(entity);
+  const coords = getEntityLngLat(entity);
+  if (!info || !coords) return;
+  pausePassiveSpin(7000);
+  state.selectedEntity = entity;
+  updateSelectedEntityCard(entity);
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(coords.lng, coords.lat, info.type.startsWith("live-") ? 1600000 : 2000000),
+    duration: 1.6,
+    complete: () => applyRegionalContext(info.label, coords.lng, coords.lat)
+  });
+  setOpsBrief(info.label, info.description || "Track selected for inspection.", `${info.type.toUpperCase()} · ${info.locationMeta}`);
+}
+
+function createFocusBrief() {
+  const now = new Date().toUTCString().slice(17, 25);
+  if (state.selectedEntity) {
+    const info = getEntityInfo(state.selectedEntity);
+    if (info) {
+      setOpsBrief(
+        `${info.label} Brief`,
+        `${info.type.toUpperCase()} asset at ${info.locationMeta}. ${info.description || "Entity remains under active monitoring."}`,
+        `ALT ${Math.round(info.altitude).toLocaleString()} m · ${now} UTC`
+      );
+      return;
+    }
+  }
+  if (state.regionFocus) {
+    setOpsBrief(
+      `${state.regionFocus.label} Brief`,
+      state.regionFocus.summary,
+      `${state.regionFocus.tracks} tracks · ${state.regionFocus.alerts} alerts · ${now} UTC`
+    );
+    return;
+  }
+  const liveCount = [state.liveFeeds.adsb, state.liveFeeds.ais].filter(feed => feed.status === "live").length;
+  setOpsBrief(
+    "Global Brief",
+    `Global watch remains active with ${dynamic.traffic.length + dynamic.liveTraffic.length} tracked assets and ${SCENARIO.alerts.length + SCENARIO.incidents.length} active alerts/incidents in the scenario layer.`,
+    `${liveCount} live feeds online · ${now} UTC`
+  );
+}
+
+function toggleAlertTour() {
+  if (state.opsTourTimer) {
+    window.clearInterval(state.opsTourTimer);
+    state.opsTourTimer = null;
+    updateOperationsControls();
+    setOpsBrief("Alert Tour Paused", "Manual control restored. Use Next Hotspot to step through alerts one by one.", "Tour offline");
+    return;
+  }
+  focusNextHotspot();
+  state.opsTourTimer = window.setInterval(() => {
+    focusNextHotspot();
+  }, 9000);
+  updateOperationsControls();
+  setOpsBrief("Alert Tour Active", "Cycling through live hotspots every 9 seconds.", "Tour online");
 }
 
 function minuteToRealJulian(offsetMinutes) {
@@ -1365,21 +1934,14 @@ function updateTrackButtons() {
   const canTrack = !!state.selectedEntity && !!state.selectedEntity.position;
   elements.trackSelected.disabled = !canTrack;
   elements.releaseTrack.disabled  = !state.trackedEntity;
+  updateOperationsControls();
 }
 
 function saveCurrentBookmark() {
-  const cg = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
   const next = {
     id:    `bookmark-${Date.now()}`,
     label: `View ${state.bookmarks.length + 1}`,
-    destination: {
-      lng:     Cesium.Math.toDegrees(cg.longitude),
-      lat:     Cesium.Math.toDegrees(cg.latitude),
-      height:  cg.height,
-      heading: viewer.camera.heading,
-      pitch:   viewer.camera.pitch,
-      roll:    viewer.camera.roll
-    }
+    destination: captureCameraDestination()
   };
   state.bookmarks = [...state.bookmarks, next].slice(-8);
   saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
@@ -1393,17 +1955,7 @@ function removeBookmark(id) {
 }
 
 function flyToBookmark(bookmark) {
-  viewer.camera.flyTo({
-    destination: Cesium.Cartesian3.fromDegrees(
-      bookmark.destination.lng, bookmark.destination.lat, bookmark.destination.height
-    ),
-    orientation: {
-      heading: bookmark.destination.heading,
-      pitch:   bookmark.destination.pitch,
-      roll:    bookmark.destination.roll
-    },
-    duration: 1.2
-  });
+  flyToDestination(bookmark.destination, undefined, 1.4);
 }
 
 function installBasemap(basemapId) {
@@ -1551,6 +2103,9 @@ function finishBoot() {
     setTimeout(() => {
       overlay.style.display = "none";
       overlay.remove();
+      if (!state.onboardingSeen) {
+        window.setTimeout(() => openMissionGuide(0), 260);
+      }
     }, 900);
   }, 750);
 }
@@ -1650,17 +2205,20 @@ function initDraggablePanels() {
       btn.textContent = `⊕ ${label}`;
       btn.title = `Restore ${label} panel`;
       btn.addEventListener("click", () => {
-        panel.classList.remove("panel-hidden");
+        setPanelHidden(panel.id, false);
         // Reset any drag transform back to CSS default
         panel.style.left = "";
         panel.style.top  = "";
         panel.style.right = "";
         panel.style.bottom = "";
+        panel.style.transform = "";
         refreshRestoreStrip();
       });
       restoreStrip.appendChild(btn);
     });
   }
+
+  refreshPanelRestoreStrip = refreshRestoreStrip;
 
   // Close buttons
   document.querySelectorAll(".panel-close-btn").forEach(btn => {
@@ -1669,8 +2227,19 @@ function initDraggablePanels() {
       const targetId = btn.dataset.closePanel;
       const panel    = targetId ? document.getElementById(targetId) : btn.closest(".draggable-panel");
       if (!panel) return;
-      panel.classList.add("panel-hidden");
+      setPanelHidden(panel.id, true);
       refreshRestoreStrip();
+    });
+  });
+
+  document.querySelectorAll(".panel-minimize-btn").forEach(btn => {
+    btn.addEventListener("click", event => {
+      event.stopPropagation();
+      const targetId = btn.dataset.minimizePanel;
+      const panel = targetId ? document.getElementById(targetId) : btn.closest(".draggable-panel");
+      if (!panel) return;
+      const current = getPanelState(panel.id);
+      setPanelMinimized(panel.id, !current.minimized);
     });
   });
 
@@ -1709,6 +2278,7 @@ function initDraggablePanels() {
 
       function onUp() {
         panel.classList.remove("is-dragging");
+        savePanelState();
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup",   onUp);
       }
@@ -1740,6 +2310,7 @@ function initDraggablePanels() {
         panel.style.top  = `${clamp(origTop  + dy, 0, window.innerHeight - 40)}px`;
       }
       function onTouchEnd() {
+        savePanelState();
         document.removeEventListener("touchmove", onTouchMove);
         document.removeEventListener("touchend",  onTouchEnd);
       }
@@ -1747,6 +2318,8 @@ function initDraggablePanels() {
       document.addEventListener("touchend",  onTouchEnd);
     }, { passive: true });
   });
+
+  applyStoredPanelState();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2431,12 +3004,25 @@ function registerEvents() {
 
   elements.saveBookmark.addEventListener("click",  saveCurrentBookmark);
   elements.clearBookmarks.addEventListener("click", () => {
-    state.bookmarks = [];
+    state.bookmarks = state.bookmarks.filter(bookmark => bookmark.system);
     saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
     renderBookmarks();
   });
+  elements.saveLayout?.addEventListener("click", saveCurrentLayout);
+  elements.clearLayouts?.addEventListener("click", () => {
+    state.savedLayouts = [];
+    saveJson(UI_STORAGE_KEYS.layouts, state.savedLayouts);
+    renderSavedLayouts();
+  });
 
   elements.refreshFeeds?.addEventListener("click",       () => refreshLiveFeeds());
+  elements.opsNextHotspot?.addEventListener("click",     focusNextHotspot);
+  elements.opsRandomTrack?.addEventListener("click",     focusRandomTrack);
+  elements.opsOpenIntel?.addEventListener("click",       () => {
+    if (state.selectedEntity) openIntelSheet(state.selectedEntity);
+  });
+  elements.opsBriefFocus?.addEventListener("click",      createFocusBrief);
+  elements.opsTourToggle?.addEventListener("click",      toggleAlertTour);
   elements.saveAisEndpoint?.addEventListener("click",    () => {
     const endpoint = elements.aisEndpoint.value.trim();
     setConfiguredAisEndpoint(endpoint);
@@ -2451,6 +3037,16 @@ function registerEvents() {
   });
   elements.testAisEndpoint?.addEventListener("click",    testAisEndpoint);
   elements.refreshNow?.addEventListener("click",         () => refreshLiveFeeds());
+  elements.btnGuide?.addEventListener("click",           () => openMissionGuide(state.onboardingStep || 0));
+  elements.missionGuideClose?.addEventListener("click",  () => closeMissionGuide(true));
+  elements.missionGuideSkip?.addEventListener("click",   () => closeMissionGuide(true));
+  elements.missionGuidePrev?.addEventListener("click",   () => stepMissionGuide(-1));
+  elements.missionGuideNext?.addEventListener("click",   () => stepMissionGuide(1));
+  elements.missionGuide?.addEventListener("click", event => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.dataset.closeGuide === "true") closeMissionGuide(true);
+  });
   elements.btnFullscreen?.addEventListener("click",      () => {
     if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
     else document.exitFullscreen?.();
@@ -2525,10 +3121,27 @@ function registerEvents() {
     if (!(target instanceof HTMLElement)) return;
     if (!target.closest(".hud-search")) elements.searchResults.classList.add("hidden");
   });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !elements.missionGuide?.classList.contains("hidden")) {
+      closeMissionGuide(true);
+      return;
+    }
+    if (event.key === "?" || (event.shiftKey && event.key === "/")) {
+      event.preventDefault();
+      openMissionGuide(state.onboardingStep || 0);
+    }
+  });
 
   elements.btnHome?.addEventListener("click",  () => {
     state.regionFocus = null;
-    viewer.camera.flyTo({ destination: homeView, duration: 1.6 });
+    flyToDestination({
+      lng: SCENARIO.initialView.lng,
+      lat: SCENARIO.initialView.lat,
+      height: SCENARIO.initialView.height,
+      heading: SCENARIO.initialView.heading,
+      pitch: SCENARIO.initialView.pitch,
+      roll: SCENARIO.initialView.roll
+    }, undefined, 1.8);
   });
   elements.btnTilt?.addEventListener("click",  () => {
     state.tiltMode = !state.tiltMode;

@@ -75,6 +75,28 @@
     <div class="conflict-box-list" id="ccb-list"></div>
   </aside>
 
+  <div id="mission-guide" class="mission-guide hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="mission-guide-title">
+    <div class="mission-guide-backdrop" data-close-guide="true"></div>
+    <section class="mission-guide-panel glass-panel">
+      <div class="mission-guide-head">
+        <div>
+          <div id="mission-guide-kicker" class="mission-guide-kicker">MISSION GUIDE</div>
+          <h2 id="mission-guide-title" class="mission-guide-title">Welcome to God's Eye</h2>
+        </div>
+        <button id="mission-guide-close" class="panel-btn" type="button">Close</button>
+      </div>
+      <div id="mission-guide-progress" class="mission-guide-progress"></div>
+      <div id="mission-guide-body" class="mission-guide-body"></div>
+      <div class="mission-guide-footer">
+        <button id="mission-guide-skip" class="panel-btn" type="button">Skip Tour</button>
+        <div class="mission-guide-nav">
+          <button id="mission-guide-prev" class="panel-btn" type="button">Previous</button>
+          <button id="mission-guide-next" class="panel-btn primary" type="button">Next</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <!-- Ping ripple (canvas overlay for click effects) -->
   <canvas id="ping-canvas" class="ping-canvas" aria-hidden="true"></canvas>
 
@@ -143,7 +165,7 @@
         <input type="text" id="search-input" class="search-input" placeholder="Search country, city, flight, alert, or zone..." autocomplete="off" />
         <button id="search-btn" class="search-btn" type="button" title="Search">⌕</button>
         <div id="search-results" class="search-results hidden"></div>
-        <div id="search-meta" class="search-meta">Type a place or live object to jump into active context.</div>
+        <div id="search-meta" class="search-meta">Search a place, alert, route, or saved view to jump straight into context.</div>
       </div>
 
       <div class="hud-clock-block">
@@ -156,6 +178,7 @@
         <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-text">BASELINE</span></span>
         <span id="hud-fps" class="hud-chip">— FPS</span>
         <span id="hud-camera" class="hud-chip">ALT — · HEADING —</span>
+        <button id="btn-guide" class="hud-action" type="button">GUIDE</button>
         <button id="btn-declutter" class="hud-action" type="button">FOCUS</button>
         <button id="btn-density" class="hud-action" type="button">COMPACT</button>
         <button id="btn-home" class="hud-action" type="button">HOME</button>
@@ -176,6 +199,7 @@
       <div class="panel-drag-bar" data-drag-target="panel-layers">
         <span class="drag-grip">⠿</span>
         <span class="drag-label">LAYERS</span>
+        <button class="panel-minimize-btn" data-minimize-panel="panel-layers" title="Minimize panel" type="button">—</button>
         <button class="panel-close-btn" data-close-panel="panel-layers" title="Hide panel" type="button">✕</button>
       </div>
       <div class="panel-header">
@@ -197,6 +221,7 @@
 
       <section class="control-group">
         <h3>Camera Bookmarks</h3>
+        <div id="camera-presets" class="camera-presets"></div>
         <div id="bookmark-list" class="bookmark-list"></div>
         <div class="bookmark-actions">
           <button id="save-bookmark" class="panel-btn primary" type="button">Save View</button>
@@ -209,6 +234,7 @@
       <div class="panel-drag-bar" data-drag-target="panel-right">
         <span class="drag-grip">⠿</span>
         <span class="drag-label">CONTROLS</span>
+        <button class="panel-minimize-btn" data-minimize-panel="panel-right" title="Minimize panel" type="button">—</button>
         <button class="panel-close-btn" data-close-panel="panel-right" title="Hide panel" type="button">✕</button>
       </div>
       <div class="panel-header">
@@ -250,6 +276,22 @@
       </section>
 
       <section class="control-group">
+        <h3>Operations Desk</h3>
+        <div class="ops-actions">
+          <button id="ops-next-hotspot" class="panel-btn primary" type="button">Next Hotspot</button>
+          <button id="ops-random-track" class="panel-btn" type="button">Random Track</button>
+          <button id="ops-open-intel" class="panel-btn" type="button" disabled>Open Intel</button>
+          <button id="ops-brief-focus" class="panel-btn" type="button">Brief Focus</button>
+          <button id="ops-tour-toggle" class="panel-btn" type="button">Tour Alerts</button>
+        </div>
+        <article id="ops-brief" class="ops-brief-card">
+          <strong id="ops-brief-title">Operations Ready</strong>
+          <p id="ops-brief-copy">Jump between hotspots, inspect random tracks, or generate a quick situational brief from the current focus.</p>
+          <small id="ops-brief-meta">Interactive tasking tools online</small>
+        </article>
+      </section>
+
+      <section class="control-group">
         <h3>Live Alerts</h3>
         <div id="event-rail" class="event-rail"></div>
       </section>
@@ -277,19 +319,29 @@
         <div id="trust-indicators" class="trust-indicators"></div>
         <small id="trust-summary" class="feed-hint">Integrity checks initializing…</small>
       </section>
+
+      <section class="control-group">
+        <h3>Saved Layouts</h3>
+        <div id="layout-list" class="layout-list"></div>
+        <div class="bookmark-actions">
+          <button id="save-layout" class="panel-btn primary" type="button">Save Layout</button>
+          <button id="clear-layouts" class="panel-btn" type="button">Clear</button>
+        </div>
+      </section>
     </aside>
 
     <section id="floating-summary" class="glass-panel draggable-panel">
       <div class="panel-drag-bar" data-drag-target="floating-summary">
         <span class="drag-grip">⠿</span>
         <span class="drag-label">STATUS</span>
+        <button class="panel-minimize-btn" data-minimize-panel="floating-summary" title="Minimize panel" type="button">—</button>
         <button class="panel-close-btn" data-close-panel="floating-summary" title="Hide panel" type="button">✕</button>
       </div>
       <div class="summary-head">
         <span id="summary-stage">LIVE</span>
         <span id="summary-time">--:--:-- UTC</span>
       </div>
-      <p id="summary-copy">God's Eye aggregates live ADS-B, AIS vessel data, orbital passes, and geopolitical overlays in real time.</p>
+      <p id="summary-copy">God's Eye turns global movement, alerts, and regional pressure points into a fast spatial briefing workflow.</p>
       <div id="summary-tags" class="summary-tags"></div>
     </section>
 
@@ -297,6 +349,7 @@
       <div class="panel-drag-bar" data-drag-target="map-legend">
         <span class="drag-grip">⠿</span>
         <span class="drag-label">LEGEND</span>
+        <button class="panel-minimize-btn" data-minimize-panel="map-legend" title="Minimize panel" type="button">—</button>
         <button class="panel-close-btn" data-close-panel="map-legend" title="Hide panel" type="button">✕</button>
       </div>
       <div class="legend-head">
