@@ -55,66 +55,41 @@ const SYSTEM_BOOKMARK_IDS = new Set(DEFAULT_BOOKMARKS.map(bookmark => bookmark.i
 
 const MISSION_GUIDE_STEPS = [
   {
-    kicker: "Why It Exists",
-    title: "A global command console, not just a globe",
-    lead: "God's Eye is built for fast situational awareness: scan the world, jump to pressure points, inspect specific assets, and turn raw motion into a usable brief.",
+    kicker: "Quick Start",
+    title: "Start here",
+    lead: "The easiest way to use this is to treat it like a live map desk: jump somewhere interesting, inspect what is nearby, and save anything you want to revisit.",
     sections: [
-      { title: "Best For", items: ["Crisis monitoring and geopolitical watch", "Explaining world events with spatial context", "Portfolio/demo storytelling for an intelligence-style interface"] },
-      { title: "Core Loop", items: ["Find a hotspot or track", "Focus the camera", "Inspect the object or region", "Save the view for later"] }
+      { title: "Try First", items: ["Use search to jump to a place, alert, or saved view", "Use Next Hotspot to move through active regions", "Click a track or incident to open more detail"] }
     ],
     actions: [
-      { id: "hotspot", label: "Jump to a Hotspot" },
-      { id: "brief", label: "Generate Global Brief" }
+      { id: "hotspot", label: "Go To Hotspot" },
+      { id: "random-track", label: "Pick A Track" }
     ]
   },
   {
-    kicker: "How To Start",
-    title: "Three good first moves",
-    lead: "If you are opening the site for the first time, these actions give you the fastest feel for what the dashboard can do.",
+    kicker: "Workflow",
+    title: "A typical session",
+    lead: "Most sessions follow the same pattern: find a region, narrow the view a bit, open intel on something specific, then save the layout if it is useful.",
     sections: [
-      { title: "Try This", items: ["Use search to jump to a country, city, alert, or saved view", "Press Next Hotspot to cycle through active regions", "Click any object on the globe to inspect it in context"] }
+      { title: "Usual Flow", items: ["Search or use a hotspot jump", "Use Focus or Compact if the screen feels busy", "Open Intel for the current selection", "Save a layout once the console looks right"] },
+      { title: "Shortcuts", items: ["Random Track is useful when you just want to explore", "Brief Focus gives you a quick summary of the current view", "Saved views and layouts help you return to the same setup later"] }
     ],
     actions: [
-      { id: "search-gulf", label: "Search Gulf" },
-      { id: "random-track", label: "Inspect Random Track" }
+      { id: "brief", label: "Create Brief" },
+      { id: "intel", label: "Open Intel" }
     ]
   },
   {
-    kicker: "Daily Workflow",
-    title: "Work like an analyst",
-    lead: "A useful rhythm is: search or jump, narrow the scene, open intel, then save the state as a repeatable operating layout.",
+    kicker: "What It Is Good For",
+    title: "Where it fits",
+    lead: "It works well as a spatial briefing tool. You can use it to follow a region, add map context to headlines, or present a more interactive portfolio piece.",
     sections: [
-      { title: "Recommended Flow", items: ["Search for a theater or click an alert", "Use Focus or Compact mode to reduce noise", "Open Intel on the selected object", "Save the layout once the console is arranged your way"] },
-      { title: "Operations Desk", items: ["Next Hotspot steps through live regions", "Random Track surfaces traffic you may have missed", "Brief Focus turns the current state into a readable summary"] }
+      { title: "Good Uses", items: ["Following signals around a region", "Turning current events into map context", "Showing your thinking through an interface that feels hands-on"] },
+      { title: "Keep It Useful", items: ["Save views for places you return to", "Save layouts for different kinds of sessions", "Use the tour or news panel when you want a little guidance"] }
     ],
     actions: [
-      { id: "intel", label: "Open Intel For Selection" },
-      { id: "save-layout", label: "Save Current Layout" }
-    ]
-  },
-  {
-    kicker: "Vision",
-    title: "How people can actually use this",
-    lead: "The strongest version of God's Eye is a cinematic spatial briefing tool for curiosity, investigation, and storytelling.",
-    sections: [
-      { title: "Use Cases", items: ["Students and researchers can connect headlines to geography", "Journalists and creators can move from article to theater map instantly", "Recruiters and visitors can experience your systems thinking through a hands-on product"] },
-      { title: "Long-Term Direction", items: ["Scenario playlists and mission tasks", "Shareable saved views for specific events", "Focused story modes that guide users through conflicts, routes, and anomalies"] }
-    ],
-    actions: [
-      { id: "tour", label: "Start Alert Tour" },
-      { id: "open-news", label: "Open Live News" }
-    ]
-  },
-  {
-    kicker: "Make It Yours",
-    title: "Personalize the command center",
-    lead: "Once you know your preferred workflow, customize the console so returning visitors land in a space that feels deliberate and clean.",
-    sections: [
-      { title: "Customization", items: ["Toggle layers depending on whether you care about aircraft, satellites, maritime, or incidents", "Save views for recurring theaters", "Use saved layouts for different modes like briefing, monitoring, or storytelling"] }
-    ],
-    actions: [
-      { id: "save-view", label: "Save Current View" },
-      { id: "home", label: "Reset To Home" }
+      { id: "tour", label: "Start Tour" },
+      { id: "save-layout", label: "Save Layout" }
     ]
   }
 ];
@@ -790,7 +765,7 @@ function executeMissionGuideAction(actionId) {
       break;
     case "intel":
       if (state.selectedEntity) openIntelSheet(state.selectedEntity);
-      else setOpsBrief("No Selection Yet", "Pick or jump to a track first, then open the intel drawer for deeper context.", "Selection required");
+      else setOpsBrief("Nothing Selected", "Pick a track or jump to a hotspot first, then open intel from there.", "Select something first");
       break;
     case "save-layout":
       saveCurrentLayout();
@@ -1075,7 +1050,7 @@ function renderEventRail(animate = false) {
   });
 }
 
-function setOpsBrief(title, copy, meta = "Interactive tasking tools online") {
+function setOpsBrief(title, copy, meta = "Quick actions") {
   if (elements.opsBriefTitle) elements.opsBriefTitle.textContent = title;
   if (elements.opsBriefCopy) elements.opsBriefCopy.textContent = copy;
   if (elements.opsBriefMeta) elements.opsBriefMeta.textContent = meta;
@@ -1122,7 +1097,7 @@ function focusNextHotspot() {
 function focusRandomTrack() {
   const candidates = [...dynamic.liveTraffic, ...dynamic.traffic].filter(entity => entity?.show !== false && entity?.position);
   if (!candidates.length) {
-    setOpsBrief("No Tracks Available", "There are no active track entities available to inspect right now.", "Awaiting feed refresh");
+    setOpsBrief("No Tracks Right Now", "There are not any active tracks to inspect at the moment.", "Waiting for refresh");
     return;
   }
   const entity = candidates[Math.floor(Math.random() * candidates.length)];
@@ -1137,7 +1112,7 @@ function focusRandomTrack() {
     duration: 1.6,
     complete: () => applyRegionalContext(info.label, coords.lng, coords.lat)
   });
-  setOpsBrief(info.label, info.description || "Track selected for inspection.", `${info.type.toUpperCase()} · ${info.locationMeta}`);
+  setOpsBrief(info.label, info.description || "A track from the current scene.", `${info.type.toUpperCase()} · ${info.locationMeta}`);
 }
 
 function createFocusBrief() {
@@ -1147,7 +1122,7 @@ function createFocusBrief() {
     if (info) {
       setOpsBrief(
         `${info.label} Brief`,
-        `${info.type.toUpperCase()} asset at ${info.locationMeta}. ${info.description || "Entity remains under active monitoring."}`,
+        `${info.type.toUpperCase()} at ${info.locationMeta}. ${info.description || "Still visible in the current scene."}`,
         `ALT ${Math.round(info.altitude).toLocaleString()} m · ${now} UTC`
       );
       return;
@@ -1164,7 +1139,7 @@ function createFocusBrief() {
   const liveCount = [state.liveFeeds.adsb, state.liveFeeds.ais].filter(feed => feed.status === "live").length;
   setOpsBrief(
     "Global Brief",
-    `Global watch remains active with ${dynamic.traffic.length + dynamic.liveTraffic.length} tracked assets and ${SCENARIO.alerts.length + SCENARIO.incidents.length} active alerts/incidents in the scenario layer.`,
+    `The scene currently shows ${dynamic.traffic.length + dynamic.liveTraffic.length} tracked assets and ${SCENARIO.alerts.length + SCENARIO.incidents.length} alerts or incidents in the scenario layer.`,
     `${liveCount} live feeds online · ${now} UTC`
   );
 }
@@ -1174,7 +1149,7 @@ function toggleAlertTour() {
     window.clearInterval(state.opsTourTimer);
     state.opsTourTimer = null;
     updateOperationsControls();
-    setOpsBrief("Alert Tour Paused", "Manual control restored. Use Next Hotspot to step through alerts one by one.", "Tour offline");
+    setOpsBrief("Tour Paused", "You can keep exploring manually, or step through hotspots one at a time.", "Tour off");
     return;
   }
   focusNextHotspot();
@@ -1182,7 +1157,7 @@ function toggleAlertTour() {
     focusNextHotspot();
   }, 9000);
   updateOperationsControls();
-  setOpsBrief("Alert Tour Active", "Cycling through live hotspots every 9 seconds.", "Tour online");
+  setOpsBrief("Tour Running", "Cycling through hotspots every 9 seconds.", "Tour on");
 }
 
 function minuteToRealJulian(offsetMinutes) {
