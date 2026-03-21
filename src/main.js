@@ -51,6 +51,15 @@ const CAMERA_PRESETS = [
   }
 ];
 
+const STARTUP_VIEW = {
+  lng: SCENARIO.initialView.lng,
+  lat: SCENARIO.initialView.lat,
+  height: 15800000,
+  heading: SCENARIO.initialView.heading,
+  pitch: -1.36,
+  roll: 0
+};
+
 const SYSTEM_BOOKMARK_IDS = new Set(DEFAULT_BOOKMARKS.map(bookmark => bookmark.id));
 
 const MISSION_GUIDE_STEPS = [
@@ -205,16 +214,16 @@ viewer.clock.shouldAnimate                 = false;
 viewer.resolutionScale                     = Math.min(window.devicePixelRatio || 1, 1.6);
 
 const homeView = Cesium.Cartesian3.fromDegrees(
-  SCENARIO.initialView.lng,
-  SCENARIO.initialView.lat,
-  SCENARIO.initialView.height
+  STARTUP_VIEW.lng,
+  STARTUP_VIEW.lat,
+  STARTUP_VIEW.height
 );
 viewer.camera.setView({
   destination: homeView,
   orientation: {
-    heading: SCENARIO.initialView.heading,
-    pitch:   SCENARIO.initialView.pitch,
-    roll:    SCENARIO.initialView.roll
+    heading: STARTUP_VIEW.heading,
+    pitch:   STARTUP_VIEW.pitch,
+    roll:    STARTUP_VIEW.roll
   }
 });
 
@@ -2060,9 +2069,9 @@ function finishBoot() {
   viewer.camera.flyTo({
     destination: homeView,
     orientation: {
-      heading: SCENARIO.initialView.heading,
-      pitch:   SCENARIO.initialView.pitch,
-      roll:    SCENARIO.initialView.roll
+      heading: STARTUP_VIEW.heading,
+      pitch:   STARTUP_VIEW.pitch,
+      roll:    STARTUP_VIEW.roll
     },
     duration: 1.4,
     complete: () => {
