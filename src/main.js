@@ -226,6 +226,7 @@ let _throughputBytes = 0;
 let _ambientUpdateTimer = null;
 let eventVisualSpawnTimer = null;
 let eventVisualPruneTimer = null;
+let eventVisualLabelTimer = null;
 let threatUpdateTimer = null;
 
 // Global Nominatim rate limiter (≤1 request per second)
@@ -1487,6 +1488,29 @@ function pickNewsLabel() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// Refresh the label/description on existing event visuals so hover tooltips
+// and the selected-entity card always reflect current news headlines.
+function refreshEventVisualLabels() {
+  if (!dynamic.eventVisuals.length) return;
+  for (const item of dynamic.eventVisuals) {
+    const newsItem = pickNewsLabel();
+    if (!newsItem) continue;
+    const headline = newsItem.title.slice(0, 80);
+    item.dot.properties.label       = `${headline} marker`;
+    item.dot.properties.description = `${newsItem.domain} — ${newsItem.title}`;
+    item.cone.properties.label       = `${headline} cone`;
+    item.cone.properties.description = `${newsItem.domain} — projection`;
+    item.trail.properties.label       = `${headline} trail`;
+    item.trail.properties.description = `${newsItem.domain} — trajectory`;
+  }
+  // Keep sidebar card fresh if the user has an event visual selected
+  const selectedType = state.selectedEntity?.properties?.entityType
+    ?.getValue?.(viewer.clock.currentTime);
+  if (selectedType === "event-visual" || selectedType === "event-cone" || selectedType === "event-trail") {
+    updateSelectedEntityCard(state.selectedEntity);
+  }
+}
+
 function spawnEventVisualBurst() {
   if (!state.layers.incidents) return;
   const picked = pickEventSource();
@@ -1579,6 +1603,7 @@ function spawnEventVisualBurst() {
 function startEventVisualLifecycle() {
   if (eventVisualSpawnTimer) window.clearInterval(eventVisualSpawnTimer);
   if (eventVisualPruneTimer) window.clearInterval(eventVisualPruneTimer);
+  if (eventVisualLabelTimer) window.clearInterval(eventVisualLabelTimer);
 
   // Delay first spawn so the globe opens clean before anything appears
   window.setTimeout(() => {
@@ -1591,6 +1616,12 @@ function startEventVisualLifecycle() {
   eventVisualPruneTimer = window.setInterval(() => {
     pruneEventVisuals();
   }, 15000);
+
+  // Refresh descriptions/labels on living visuals every 45 s so
+  // the hover tooltip and entity card always show current headlines.
+  eventVisualLabelTimer = window.setInterval(() => {
+    refreshEventVisualLabels();
+  }, 45000);
 }
 
 function headingBetweenPositions(a, b) {
