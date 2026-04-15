@@ -14,8 +14,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-DlnyC18j.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-D3erBuOu.css">
+  <script type="module" crossorigin src="./assets/index-CULNJwoQ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Bp7U1q_E.css">
 </head>
 <body>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
@@ -409,6 +409,7 @@
         <a id="live-news-headline" class="live-news-headline" href="https://www.gdeltproject.org" target="_blank" rel="noopener noreferrer">🛰 Live headlines initializing…</a>
       </div>
       <div id="live-status-right">
+        <span id="presence-indicator" class="hud-chip presence-indicator">Presence offline</span>
         <div class="footer-signals" id="footer-signals">
           <span class="footer-signal"><span class="footer-signal-icon green" id="sig-adsb"></span>ADS-B</span>
           <span class="footer-signal"><span class="footer-signal-icon green" id="sig-news"></span>NEWS</span>
@@ -450,6 +451,30 @@
         </section>
       </div>
     </aside>
+
+    <!-- ═══════════════════ GLOBE NAVIGATION TOOLBAR ═══════════════════ -->
+    <nav id="globe-nav" class="globe-nav" aria-label="Globe navigation">
+      <button id="nav-zoom-in" class="globe-nav-btn" type="button" title="Zoom in (+)">
+        <svg viewBox="0 0 20 20" width="18" height="18"><line x1="10" y1="4" x2="10" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <button id="nav-zoom-out" class="globe-nav-btn" type="button" title="Zoom out (−)">
+        <svg viewBox="0 0 20 20" width="18" height="18"><line x1="4" y1="10" x2="16" y2="10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="globe-nav-sep"></div>
+      <button id="nav-north" class="globe-nav-btn" type="button" title="Reset heading (north up)">
+        <svg viewBox="0 0 20 20" width="18" height="18"><polygon points="10,3 15,17 10,13 5,17" fill="currentColor" opacity="0.9"/></svg>
+      </button>
+      <button id="nav-tilt-up" class="globe-nav-btn" type="button" title="Tilt up">
+        <svg viewBox="0 0 20 20" width="18" height="18"><polyline points="4,13 10,6 16,13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button id="nav-tilt-down" class="globe-nav-btn" type="button" title="Tilt down">
+        <svg viewBox="0 0 20 20" width="18" height="18"><polyline points="4,7 10,14 16,7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="globe-nav-sep"></div>
+      <button id="nav-fly-home" class="globe-nav-btn globe-nav-label" type="button" title="Fly home (H)">⌂</button>
+      <button id="nav-fly-random" class="globe-nav-btn globe-nav-label" type="button" title="Random hotspot (J)">⚡</button>
+    </nav>
+
   </div><!-- /#app -->
 
   <!-- ── Live News Briefing ─────────────────────────────────────────────── -->

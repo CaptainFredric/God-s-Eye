@@ -1,6 +1,7 @@
 import { BASEMAPS, DEFAULT_BOOKMARKS, FX_MODES, LAYERS, SCENARIO, STORAGE_KEYS } from "./data/scenario.js";
 import { fetchLiveFeeds, fetchAisFeed, getConfiguredAisEndpoint, setConfiguredAisEndpoint } from "./services/live-feeds.js";
 import { NEWS_CATEGORIES, fetchNewsCategory, fetchAllNewsCategories, invalidateNewsCache } from "./services/news-feeds.js";
+import { initPresence, setPresenceName, getPresencePeers, onPeersChanged, isPresenceConnected } from "./services/presence.js";
 
 const Cesium = await loadCesium();
 
@@ -20,8 +21,11 @@ const UI_STORAGE_KEYS = {
   compact:   "panopticon-earth-compact",
   panelState:"panopticon-earth-panel-state",
   layouts:   "panopticon-earth-layouts",
-  onboardingSeen: "panopticon-earth-onboarding-seen"
+  onboardingSeen: "panopticon-earth-onboarding-seen",
+  panelStateVersion: "panopticon-earth-panel-version"
 };
+
+const PANEL_STATE_VERSION = 2;
 
 const BOOT_SESSION_KEY = "panopticon-earth-boot-seen";
 
@@ -119,7 +123,7 @@ const state = {
   intelSheetOpen:        false,
   declutter:             loadJson(UI_STORAGE_KEYS.declutter, false),
   compact:               loadJson(UI_STORAGE_KEYS.compact, false),
-  panelState:            loadJson(UI_STORAGE_KEYS.panelState, createDefaultPanelState()),
+  panelState:            loadPanelStateWithVersion(),
   savedLayouts:          loadJson(UI_STORAGE_KEYS.layouts, []),
   tiltMode:              false,
   regionFocus:           null,
@@ -176,6 +180,35 @@ const sparklineData = {
   feeds: []
 };
 const SPARKLINE_MAX_POINTS = 12;
+
+const EVENT_VISUAL_STYLES = {
+  alert: {
+    dot: "#ff4d6d",
+    cone: "#ff9f43",
+    trail: "#00d4ff",
+    ttlMs: 120000,
+    coneLength: 210000,
+    coneRadius: 68000,
+    trailDistance: 540000
+  },
+  incident: {
+    dot: "#ff0040",
+    cone: "#ff4d6d",
+    trail: "#a78bfa",
+    ttlMs: 150000,
+    coneLength: 260000,
+    coneRadius: 82000,
+    trailDistance: 680000
+  }
+};
+
+const EVENT_REGION_OVERRIDES = {
+  gulf: { trail: "#00ffc8", cone: "#ff9f43" },
+  pacific: { trail: "#00d4ff", cone: "#a78bfa" },
+  theater: { trail: "#ff4d6d", cone: "#ff0040" },
+  europe: { trail: "#7ec8ff", cone: "#ff9f43" }
+};
+
 const dynamic = {
   trails:      [],
   zones:       [],
@@ -183,10 +216,29 @@ const dynamic = {
   traffic:     [],
   rings:       [],
   radars:      [],
-  liveTraffic: []
+  liveTraffic: [],
+  eventVisuals: []
 };
 
 let frameSamples = [];
+let _consolePulseTimer = null;
+let _throughputBytes = 0;
+let _ambientUpdateTimer = null;
+let eventVisualSpawnTimer = null;
+let eventVisualPruneTimer = null;
+let threatUpdateTimer = null;
+
+// Global Nominatim rate limiter (≤1 request per second)
+let _lastNominatimMs = 0;
+async function nominatimFetch(url) {
+  const now = Date.now();
+  const wait = Math.max(0, 1050 - (now - _lastNominatimMs));
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  _lastNominatimMs = Date.now();
+  return fetch(url, {
+    headers: { "Accept-Language": "en-US,en", "User-Agent": "GodsEye/1.0 intelligence-dashboard" }
+  });
+}
 
 const viewer = new Cesium.Viewer("cesiumContainer", {
   animation:            false,
@@ -331,7 +383,7 @@ function tickNarratives() {
   renderEventRail(true);
 
   const selectedType = state.selectedEntity?.properties?.entityType?.getValue?.(viewer.clock.currentTime);
-  if (selectedType === "incident") {
+  if (selectedType === "incident" || selectedType === "alert") {
     updateSelectedEntityCard(state.selectedEntity);
     if (state.intelSheetOpen) openIntelSheet(state.selectedEntity);
   }
@@ -507,10 +559,25 @@ function normalizeBookmarks(bookmarks) {
 }
 
 function createDefaultPanelState() {
-  return Object.fromEntries(PANEL_IDS.map(id => [id, {
-    hidden: false,
-    minimized: id === "map-legend"
-  }]));
+  const defaults = {
+    "panel-layers": { hidden: false, minimized: false },
+    "panel-right": { hidden: false, minimized: true },
+    "floating-summary": { hidden: false, minimized: true },
+    "map-legend": { hidden: true, minimized: true }
+  };
+  return Object.fromEntries(PANEL_IDS.map(id => [id, defaults[id] ?? { hidden: false, minimized: false }]));
+}
+
+function loadPanelStateWithVersion() {
+  const storedVersion = loadJson(UI_STORAGE_KEYS.panelStateVersion, 0);
+  if (storedVersion < PANEL_STATE_VERSION) {
+    // Version mismatch — reset to clean defaults and save new version
+    const fresh = createDefaultPanelState();
+    saveJson(UI_STORAGE_KEYS.panelState, fresh);
+    saveJson(UI_STORAGE_KEYS.panelStateVersion, PANEL_STATE_VERSION);
+    return fresh;
+  }
+  return loadJson(UI_STORAGE_KEYS.panelState, createDefaultPanelState());
 }
 
 function normalizePanelState(panelState) {
@@ -527,10 +594,12 @@ function normalizePanelState(panelState) {
 function savePanelState() {
   state.panelState = normalizePanelState(state.panelState);
   saveJson(UI_STORAGE_KEYS.panelState, state.panelState);
+  saveJson(UI_STORAGE_KEYS.panelStateVersion, PANEL_STATE_VERSION);
 }
 
 function getPanelState(panelId) {
-  state.panelState[panelId] ??= { hidden: false, minimized: false };
+  const defaultState = createDefaultPanelState()[panelId] ?? { hidden: false, minimized: false };
+  state.panelState[panelId] ??= { ...defaultState };
   return state.panelState[panelId];
 }
 
@@ -567,7 +636,25 @@ function applyStoredPanelState() {
     const button = panel.querySelector(`[data-minimize-panel="${panelId}"]`);
     if (button) button.textContent = current.minimized ? "+" : "—";
   });
+  sanitizePanelPositions();
   refreshPanelRestoreStrip();
+}
+
+function sanitizePanelPositions() {
+  if (window.innerWidth <= 980) return;
+  const minTop = 118;
+  document.querySelectorAll(".draggable-panel").forEach(panel => {
+    if (!(panel instanceof HTMLElement)) return;
+    if (panel.classList.contains("panel-hidden")) return;
+    const rect = panel.getBoundingClientRect();
+    if (rect.top >= minTop) return;
+    panel.style.position = "fixed";
+    panel.style.left = `${Math.max(12, rect.left)}px`;
+    panel.style.top = `${minTop}px`;
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+    panel.style.transform = "none";
+  });
 }
 
 function captureCameraDestination() {
@@ -1326,6 +1413,186 @@ function destinationPoint(latDeg, lngDeg, distanceMeters, bearingDeg) {
   return { lat: Cesium.Math.toDegrees(tLat), lng: Cesium.Math.toDegrees(tLng) };
 }
 
+function resolveEventRegionKey(lng, lat) {
+  if (lng >= 43 && lng <= 62 && lat >= 22 && lat <= 38) return "gulf";
+  if (lng >= 125 && lng <= 170 && lat >= 15 && lat <= 45) return "pacific";
+  if (lng >= 44 && lng <= 58 && lat >= 30 && lat <= 40) return "theater";
+  if (lng >= -10 && lng <= 35 && lat >= 35 && lat <= 60) return "europe";
+  return null;
+}
+
+function resolveEventVisualStyle(kind, lng, lat) {
+  const base = EVENT_VISUAL_STYLES[kind] ?? EVENT_VISUAL_STYLES.alert;
+  const regionKey = resolveEventRegionKey(lng, lat);
+  const override = regionKey ? EVENT_REGION_OVERRIDES[regionKey] : null;
+  if (!override) return base;
+  return {
+    ...base,
+    ...override
+  };
+}
+
+function pickEventSource() {
+  const weighted = [
+    ...SCENARIO.alerts.map(item => ({ kind: "alert", source: item, weight: 2 })),
+    ...SCENARIO.incidents.map(item => ({ kind: "incident", source: item, weight: 3 }))
+  ];
+  if (!weighted.length) return null;
+
+  const pool = [];
+  weighted.forEach(item => {
+    for (let i = 0; i < item.weight; i += 1) pool.push(item);
+  });
+
+  if (state.regionFocus?.label) {
+    const camCarto = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+    const camLat = Cesium.Math.toDegrees(camCarto.latitude);
+    const camLng = Cesium.Math.toDegrees(camCarto.longitude);
+    const focused = pool.filter(item => {
+      const loc = item.source.location;
+      if (!loc) return false;
+      return haversineKm(loc.lat, loc.lng, camLat, camLng) <= 2200;
+    });
+    if (focused.length) return focused[Math.floor(Math.random() * focused.length)];
+  }
+
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function pruneEventVisuals(forceTrim = false) {
+  const now = Date.now();
+  const maxVisuals = 12;
+  for (let i = dynamic.eventVisuals.length - 1; i >= 0; i -= 1) {
+    const item = dynamic.eventVisuals[i];
+    const expired = forceTrim || now - item.bornAt > item.ttlMs;
+    if (!expired) continue;
+    viewer.entities.remove(item.dot);
+    viewer.entities.remove(item.cone);
+    viewer.entities.remove(item.trail);
+    dynamic.eventVisuals.splice(i, 1);
+  }
+
+  while (dynamic.eventVisuals.length > maxVisuals) {
+    const oldest = dynamic.eventVisuals.shift();
+    if (!oldest) break;
+    viewer.entities.remove(oldest.dot);
+    viewer.entities.remove(oldest.cone);
+    viewer.entities.remove(oldest.trail);
+  }
+}
+
+function pickNewsLabel() {
+  const pool = state.newsTickerPool;
+  if (!pool.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function spawnEventVisualBurst() {
+  if (!state.layers.incidents) return;
+  const picked = pickEventSource();
+  if (!picked?.source?.location) return;
+
+  const { kind, source } = picked;
+  const { lng: baseLng, lat: baseLat } = source.location;
+
+  // Apply positional jitter so visuals don't pile on the exact same coordinate
+  const jitterLng = baseLng + (Math.random() - 0.5) * 3.2;
+  const jitterLat = baseLat + (Math.random() - 0.5) * 2.4;
+  const lng = jitterLng;
+  const lat = jitterLat;
+
+  const style = resolveEventVisualStyle(kind, baseLng, baseLat);
+  const bearing = (performance.now() / 40 + Math.random() * 360) % 360;
+  const target = destinationPoint(lat, lng, style.trailDistance, bearing);
+
+  // Pull a live news headline for the label when available
+  const newsItem = pickNewsLabel();
+  const eventLabel = newsItem
+    ? newsItem.title.slice(0, 80)
+    : (source.title || source.label || "Event");
+
+  const dot = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(lng, lat, 1200),
+    point: {
+      pixelSize: kind === "incident" ? 12 : 9,
+      color: Cesium.Color.fromCssColorString(style.dot).withAlpha(0.95),
+      outlineColor: Cesium.Color.WHITE.withAlpha(0.85),
+      outlineWidth: 1.5,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY
+    },
+    properties: {
+      layerId: "incidents",
+      entityType: "event-visual",
+      label: `${eventLabel} marker`,
+      description: newsItem ? `${newsItem.domain} — ${newsItem.title}` : "Ephemeral conflict marker"
+    }
+  });
+
+  const coneLen = style.coneLength;
+  const cone = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(lng, lat, coneLen / 2),
+    cylinder: {
+      length: coneLen,
+      topRadius: 0,
+      bottomRadius: style.coneRadius,
+      material: Cesium.Color.fromCssColorString(style.cone).withAlpha(0.14),
+      outline: true,
+      outlineColor: Cesium.Color.fromCssColorString(style.cone).withAlpha(0.35)
+    },
+    properties: {
+      layerId: "incidents",
+      entityType: "event-cone",
+      label: `${eventLabel} cone`,
+      description: newsItem ? `${newsItem.domain} — projection` : "Ephemeral event projection cone"
+    }
+  });
+
+  const trail = viewer.entities.add({
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+        lng, lat, 1000,
+        target.lng, target.lat, 22000
+      ]),
+      width: kind === "incident" ? 2.6 : 2.1,
+      material: Cesium.Color.fromCssColorString(style.trail).withAlpha(0.72),
+      arcType: Cesium.ArcType.GEODESIC
+    },
+    properties: {
+      layerId: "incidents",
+      entityType: "event-trail",
+      label: `${eventLabel} trail`,
+      description: newsItem ? `${newsItem.domain} — trajectory` : "Ephemeral event trajectory"
+    }
+  });
+
+  dynamic.eventVisuals.push({
+    bornAt: Date.now(),
+    ttlMs: style.ttlMs + Math.floor(Math.random() * 30000),
+    dot,
+    cone,
+    trail
+  });
+
+  pruneEventVisuals();
+}
+
+function startEventVisualLifecycle() {
+  if (eventVisualSpawnTimer) window.clearInterval(eventVisualSpawnTimer);
+  if (eventVisualPruneTimer) window.clearInterval(eventVisualPruneTimer);
+
+  // Delay first spawn so the globe opens clean before anything appears
+  window.setTimeout(() => {
+    spawnEventVisualBurst();
+    eventVisualSpawnTimer = window.setInterval(() => {
+      spawnEventVisualBurst();
+    }, 20000);
+  }, 8000);
+
+  eventVisualPruneTimer = window.setInterval(() => {
+    pruneEventVisuals();
+  }, 15000);
+}
+
 function headingBetweenPositions(a, b) {
   if (!a || !b) return 0;
   const ac = Cesium.Cartographic.fromCartesian(a);
@@ -1522,6 +1789,11 @@ function updateZones() {
 function updateIncidents() {
   dynamic.incidents.forEach(({ entity }) => { entity.show = !!state.layers.incidents; });
   dynamic.rings.forEach(({ entity })     => { entity.show = !!state.layers.incidents; });
+  dynamic.eventVisuals.forEach(({ dot, cone, trail }) => {
+    dot.show = !!state.layers.incidents;
+    cone.show = !!state.layers.incidents;
+    trail.show = !!state.layers.incidents;
+  });
 }
 
 function updateLiveMetrics() {
@@ -1723,12 +1995,18 @@ async function refreshLiveFeeds() {
   state.liveFeeds = await fetchLiveFeeds();
   renderFeedStatus();
   renderTrustIndicators();
-  clearLiveTraffic();
-  if (state.liveFeeds.adsb.status === "live") {
-    addLiveTrafficEntities(state.liveFeeds.adsb.records, "commercial", Cesium.Color.fromCssColorString("#90f4ff"), "live-adsb");
-  }
-  if (state.liveFeeds.ais.status === "live") {
-    addLiveTrafficEntities(state.liveFeeds.ais.records, "maritime", Cesium.Color.fromCssColorString("#7bffcb"), "live-ais");
+  // Only clear + recreate entities if at least one feed has data;
+  // otherwise keep previous entities visible until next successful refresh
+  const hasAdsb = state.liveFeeds.adsb.status === "live" && state.liveFeeds.adsb.records.length;
+  const hasAis  = state.liveFeeds.ais.status  === "live" && state.liveFeeds.ais.records.length;
+  if (hasAdsb || hasAis) {
+    clearLiveTraffic();
+    if (hasAdsb) {
+      addLiveTrafficEntities(state.liveFeeds.adsb.records, "commercial", Cesium.Color.fromCssColorString("#90f4ff"), "live-adsb");
+    }
+    if (hasAis) {
+      addLiveTrafficEntities(state.liveFeeds.ais.records, "maritime", Cesium.Color.fromCssColorString("#7bffcb"), "live-ais");
+    }
   }
   refreshEntityVisibility();
   const now = new Date().toLocaleTimeString([], { hour12: false });
@@ -2125,13 +2403,25 @@ function finishBoot({ immediate = false } = {}) {
     overlay.style.pointerEvents = "none";
     document.body.classList.add("boot-complete");
     pulseConsoleFrame("boot");
+    applyCleanLandingLayout();
     startAmbientUpdates();
+    initPresenceLayer();
     updateSummaryHint();
     try {
       window.sessionStorage.setItem(BOOT_SESSION_KEY, "1");
     } catch {
       // Ignore unavailable session storage.
     }
+    // After boot animations finish, remove animation classes so
+    // panel-hidden / panel-minimized CSS takes effect properly.
+    setTimeout(() => {
+      document.body.classList.remove("ui-booting");
+      document.querySelectorAll(".draggable-panel, #hud-top, #hud-bottom, .news-toggle-btn").forEach(el => {
+        el.style.animation = "none";
+      });
+      // Re-apply stored panel state now that animations are cleared
+      applyStoredPanelState();
+    }, immediate ? 200 : 900);
     setTimeout(() => {
       overlay.style.display = "none";
       overlay.remove();
@@ -2164,7 +2454,13 @@ function finishBoot({ immediate = false } = {}) {
   setTimeout(finishOverlay, 320);
 }
 
-let _consolePulseTimer = null;
+function applyCleanLandingLayout() {
+  if (window.innerWidth <= 980) return;
+  setPanelMinimized("panel-right", true);
+  setPanelMinimized("floating-summary", true);
+  setPanelHidden("map-legend", true);
+  refreshPanelRestoreStrip();
+}
 
 function pulseConsoleFrame(mode = "click") {
   const frame = elements.consoleFrame;
@@ -2266,6 +2562,19 @@ function initDraggablePanels() {
         panel.style.right = "";
         panel.style.bottom = "";
         panel.style.transform = "";
+        // On mobile, open the corresponding drawer
+        if (window.innerWidth <= 980) {
+          const drawerMap = { "panel-layers": "layers", "floating-summary": "controls" };
+          const drawer = drawerMap[panel.id];
+          if (drawer) {
+            // Force-open (not toggle) so restore always opens the drawer
+            state.activeDrawer = drawer;
+            document.body.classList.add("mobile-drawer-open");
+            document.body.classList.toggle("mobile-layers-open", drawer === "layers");
+            document.body.classList.toggle("mobile-controls-open", drawer === "controls");
+            elements.mobileBackdrop.classList.remove("hidden");
+          }
+        }
         refreshRestoreStrip();
       });
       restoreStrip.appendChild(btn);
@@ -2282,6 +2591,8 @@ function initDraggablePanels() {
       const panel    = targetId ? document.getElementById(targetId) : btn.closest(".draggable-panel");
       if (!panel) return;
       setPanelHidden(panel.id, true);
+      // If a mobile drawer is open for this panel, close it too
+      if (window.innerWidth <= 980) setMobileDrawer(null);
       refreshRestoreStrip();
     });
   });
@@ -2490,9 +2801,7 @@ function showClickLocationPopup(screenX, screenY, lat, lng) {
   _clpGeoTimer = setTimeout(async () => {
     try {
       const url  = `https://nominatim.openstreetmap.org/reverse?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&format=json`;
-      const resp = await fetch(url, {
-        headers: { "Accept-Language": "en-US,en", "User-Agent": "GodsEye/1.0 intelligence-dashboard" }
-      });
+      const resp = await nominatimFetch(url);
       if (cancelled || !resp.ok) return;
       const data = await resp.json();
       if (cancelled) return;
@@ -2588,9 +2897,7 @@ async function reverseGeocode(lat, lng) {
 
   try {
     const url  = `https://nominatim.openstreetmap.org/reverse?lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}&format=json`;
-    const resp = await fetch(url, {
-      headers: { "Accept-Language": "en-US,en", "User-Agent": "GodsEye/1.0 intelligence-dashboard" }
-    });
+    const resp = await nominatimFetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const addr = data.address || {};
@@ -2955,10 +3262,8 @@ async function runSearch(query) {
 
   let placeResults = [];
   try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=7&q=${encodeURIComponent(trimmed)}`,
-      { signal: state.searchAbortController.signal, headers: { Accept: "application/json" } }
-    );
+    const geoUrl = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=7&q=${encodeURIComponent(trimmed)}`;
+    const response = await nominatimFetch(geoUrl);
     const payload = await response.json();
     placeResults = Array.isArray(payload)
       ? payload
@@ -3278,6 +3583,7 @@ function registerEvents() {
   window.addEventListener("resize", () => {
     viewer.resize();
     if (window.innerWidth > 980) setMobileDrawer(null);
+    sanitizePanelPositions();
     updateSummaryHint();
   });
 
@@ -3292,8 +3598,82 @@ function registerEvents() {
     if (event.key.toLowerCase() === "c") { setMobileDrawer(window.innerWidth <= 980 ? "controls" : null); return; }
     if (event.key.toLowerCase() === "n") { toggleNewsPanel(); return; }
     if (event.key.toLowerCase() === "i") { if (state.selectedEntity) openIntelSheet(state.selectedEntity); return; }
+    if (event.key.toLowerCase() === "h") { navFlyHome(); return; }
+    if (event.key.toLowerCase() === "j") { focusNextHotspot(); return; }
     if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); closeNewsPanel(); }
   });
+
+  // ── Globe navigation toolbar ──────────────────────────────────
+  const navZoomIn    = document.getElementById("nav-zoom-in");
+  const navZoomOut   = document.getElementById("nav-zoom-out");
+  const navNorth     = document.getElementById("nav-north");
+  const navTiltUp    = document.getElementById("nav-tilt-up");
+  const navTiltDown  = document.getElementById("nav-tilt-down");
+  const navFlyHomeBtn  = document.getElementById("nav-fly-home");
+  const navFlyRandom   = document.getElementById("nav-fly-random");
+
+  navZoomIn?.addEventListener("click", () => {
+    const cg = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+    const newHeight = Math.max(cg.height * 0.5, 5000);
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(cg.longitude, cg.latitude, newHeight),
+      orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
+      duration: 0.6
+    });
+    pausePassiveSpin(4000);
+  });
+
+  navZoomOut?.addEventListener("click", () => {
+    const cg = Cesium.Cartographic.fromCartesian(viewer.camera.positionWC);
+    const newHeight = Math.min(cg.height * 2.0, 40000000);
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromRadians(cg.longitude, cg.latitude, newHeight),
+      orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
+      duration: 0.6
+    });
+    pausePassiveSpin(4000);
+  });
+
+  navNorth?.addEventListener("click", () => {
+    viewer.camera.flyTo({
+      destination: viewer.camera.positionWC,
+      orientation: { heading: 0, pitch: viewer.camera.pitch, roll: 0 },
+      duration: 0.5
+    });
+  });
+
+  navTiltUp?.addEventListener("click", () => {
+    const newPitch = Math.min(viewer.camera.pitch + Cesium.Math.toRadians(15), Cesium.Math.toRadians(-5));
+    viewer.camera.flyTo({
+      destination: viewer.camera.positionWC,
+      orientation: { heading: viewer.camera.heading, pitch: newPitch, roll: 0 },
+      duration: 0.4
+    });
+  });
+
+  navTiltDown?.addEventListener("click", () => {
+    const newPitch = Math.max(viewer.camera.pitch - Cesium.Math.toRadians(15), Cesium.Math.toRadians(-90));
+    viewer.camera.flyTo({
+      destination: viewer.camera.positionWC,
+      orientation: { heading: viewer.camera.heading, pitch: newPitch, roll: 0 },
+      duration: 0.4
+    });
+  });
+
+  navFlyHomeBtn?.addEventListener("click", navFlyHome);
+  navFlyRandom?.addEventListener("click", focusNextHotspot);
+}
+
+function navFlyHome() {
+  state.regionFocus = null;
+  flyToDestination({
+    lng: SCENARIO.initialView.lng,
+    lat: SCENARIO.initialView.lat,
+    height: SCENARIO.initialView.height,
+    heading: SCENARIO.initialView.heading,
+    pitch: SCENARIO.initialView.pitch,
+    roll: SCENARIO.initialView.roll
+  }, undefined, 1.8);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3351,6 +3731,12 @@ function initNewsPanel() {
     invalidateNewsCache();
     loadNewsCategory(state.newsCategory, false);
   }, 90_000);
+
+  // Background full-category refresh every 3 minutes so the event visual
+  // label pool stays current even when the news panel is closed
+  window.setInterval(() => {
+    prefetchAllCategories();
+  }, 180_000);
 
   startNewsTicker();
 
@@ -3486,6 +3872,21 @@ function renderNewsCards(articles) {
   const frag = document.createDocumentFragment();
   articles.forEach((article, i) => {
     const card = buildNewsCard(article, cat, i);
+    card.tabIndex = 0;
+    card.addEventListener("keydown", event => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        const next = card.nextElementSibling;
+        if (next instanceof HTMLElement) next.focus();
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        const prev = card.previousElementSibling;
+        if (prev instanceof HTMLElement) prev.focus();
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        card.click();
+      }
+    });
     frag.appendChild(card);
   });
   elements.newsCards.innerHTML = "";
@@ -3657,27 +4058,16 @@ function updateBadge(count) {
   if (!state.newsOpen && count > 0) {
     elements.newsBadge.textContent = count > 99 ? "99+" : String(count);
     elements.newsBadge.classList.remove("hidden");
+    return;
   }
+  elements.newsBadge.classList.add("hidden");
 }
 
-  articles.forEach((article, i) => {
-    const card = buildNewsCard(article, cat, i);
-    card.tabIndex = 0;
-    card.addEventListener("keydown", e => {
-      if (e.key === "ArrowDown" || e.key === "Tab") {
-        e.preventDefault();
-        const next = card.nextElementSibling;
-        if (next) next.focus();
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const prev = card.previousElementSibling;
-        if (prev) prev.focus();
-      } else if (e.key === "Enter" || e.key === " ") {
-        card.click();
-      }
-    });
-    frag.appendChild(card);
-  });
+function hideBadge() {
+  if (!elements.newsBadge) return;
+  elements.newsBadge.classList.add("hidden");
+}
+
 function animateRefreshButton(spinning) {
   if (!elements.newsRefreshBtn) return;
   elements.newsRefreshBtn.classList.toggle("spinning", spinning);
@@ -3737,10 +4127,10 @@ function renderSparkline(key) {
 function updateThreatLevel() {
   if (!elements.threatSegments) return;
   const segs = elements.threatSegments.querySelectorAll(".threat-seg");
-  const alertCount = viewer.entities.values.filter(e =>
-    e.name && (e.name.includes("INCIDENT") || e.name.includes("ALERT") || e.name.includes("Zone"))
-  ).length;
-  const level = Math.min(10, Math.round(alertCount * 1.2));
+  const activeIncidentCount = dynamic.incidents.filter(({ entity }) => entity.show).length;
+  const activeZoneCount = dynamic.zones.filter(({ entity }) => entity.show).length;
+  const burstCount = dynamic.eventVisuals.length;
+  const level = Math.min(10, Math.max(1, Math.round(activeIncidentCount * 1.6 + activeZoneCount * 0.7 + burstCount * 0.08)));
 
   segs.forEach((seg, i) => {
     seg.classList.remove("active", "low", "med", "high", "crit");
@@ -3762,7 +4152,6 @@ function updateThreatLevel() {
 }
 
 // Data throughput simulation
-let _throughputBytes = 0;
 function updateThroughput() {
   if (!elements.throughputBars || !elements.throughputValue) return;
   // Simulate data flow based on active feeds
@@ -3792,19 +4181,109 @@ function updateSignalIndicators() {
 }
 
 // Master ambient update loop for all dynamic indicators
-let _ambientUpdateTimer = null;
 function startAmbientUpdates() {
   if (_ambientUpdateTimer) clearInterval(_ambientUpdateTimer);
+  if (threatUpdateTimer) clearInterval(threatUpdateTimer);
   // Fast updates (every 2s) for throughput/signal
   _ambientUpdateTimer = setInterval(() => {
     updateThroughput();
     updateSignalIndicators();
   }, 2000);
   // Slower threat update every 8s
-  setInterval(updateThreatLevel, 8000);
+  threatUpdateTimer = setInterval(updateThreatLevel, 8000);
+  startEventVisualLifecycle();
   // Initial run
   updateThroughput();
   updateSignalIndicators();
   updateThreatLevel();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTIPLAYER PRESENCE LAYER
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** @type {Map<string, Cesium.Entity>} */
+const presenceEntities = new Map();
+
+function initPresenceLayer() {
+  // Restore saved operator name or generate one
+  let operatorName;
+  try { operatorName = localStorage.getItem("panopticon-earth-operator-name"); } catch { /* */ }
+  if (!operatorName) {
+    operatorName = `Operator-${Math.floor(Math.random() * 9000 + 1000)}`;
+    try { localStorage.setItem("panopticon-earth-operator-name", operatorName); } catch { /* */ }
+  }
+
+  initPresence(viewer);
+  setPresenceName(operatorName);
+
+  // Render peer entities whenever the peer list changes
+  onPeersChanged(renderPresencePeers);
+
+  // Update the presence status indicator every 3 seconds
+  setInterval(updatePresenceIndicator, 3000);
+  updatePresenceIndicator();
+}
+
+function renderPresencePeers(peers) {
+  // Remove entities for peers that left
+  for (const [id, entity] of presenceEntities) {
+    if (!peers.has(id)) {
+      viewer.entities.remove(entity);
+      presenceEntities.delete(id);
+    }
+  }
+
+  // Update or create entities for current peers
+  for (const [id, peer] of peers) {
+    let entity = presenceEntities.get(id);
+    const position = Cesium.Cartesian3.fromDegrees(peer.lng, peer.lat, Math.min(peer.alt * 0.5, 600000));
+
+    if (entity) {
+      entity.position = position;
+      if (entity.label) entity.label.text = peer.name;
+    } else {
+      entity = viewer.entities.add({
+        id: `presence-${id}`,
+        position,
+        point: {
+          pixelSize: 10,
+          color: Cesium.Color.fromCssColorString(peer.color).withAlpha(0.9),
+          outlineColor: Cesium.Color.WHITE.withAlpha(0.8),
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        label: {
+          text: peer.name,
+          font: '12px "Share Tech Mono"',
+          fillColor: Cesium.Color.fromCssColorString(peer.color),
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString("rgba(4,10,18,0.82)"),
+          backgroundPadding: new Cesium.Cartesian2(6, 4),
+          pixelOffset: new Cesium.Cartesian2(14, -4),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          scale: 0.8
+        },
+        properties: {
+          layerId: "presence",
+          entityType: "presence-peer",
+          label: peer.name,
+          description: `Remote operator: ${peer.name}`
+        }
+      });
+      presenceEntities.set(id, entity);
+    }
+  }
+}
+
+function updatePresenceIndicator() {
+  const el = document.getElementById("presence-indicator");
+  if (!el) return;
+  const connected = isPresenceConnected();
+  const peerCount = getPresencePeers().size;
+  el.classList.toggle("connected", connected);
+  el.textContent = connected
+    ? `${peerCount + 1} operator${peerCount + 1 !== 1 ? "s" : ""} online`
+    : "Presence offline";
 }
 
