@@ -993,14 +993,16 @@ canvas {
 .logo-icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  border: 1px solid rgba(0, 210, 255, 0.3);
+  width: 48px;
+  height: 48px;
+  border-radius: 0;
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  border: none;
   color: var(--cyan);
-  background: linear-gradient(135deg, rgba(0, 210, 255, 0.2), rgba(167, 139, 250, 0.18));
-  box-shadow: inset 0 0 14px rgba(0, 210, 255, 0.1), 0 0 22px rgba(0, 210, 255, 0.18);
-  animation: logoGlow 3s ease-in-out infinite;
+  font-size: 1.15rem;
+  background: linear-gradient(160deg, rgba(0, 180, 230, 0.22), rgba(167, 139, 250, 0.18), rgba(0, 180, 230, 0.12));
+  box-shadow: inset 0 0 18px rgba(0, 210, 255, 0.12), 0 0 28px rgba(0, 210, 255, 0.22);
+  animation: logoGlow 4s ease-in-out infinite;
 }
 
 @keyframes logoGlow {
@@ -1009,15 +1011,18 @@ canvas {
 }
 
 .logo-text {
-  font-size: 1rem;
-  letter-spacing: 0.2em;
+  font-size: 1.22rem;
+  letter-spacing: 0.26em;
   color: var(--cyan);
+  text-shadow: 0 0 18px rgba(0, 210, 255, 0.55), 0 0 40px rgba(0, 210, 255, 0.2);
 }
 
 .logo-sub {
-  margin-top: 4px;
-  font-size: 0.68rem;
-  color: var(--muted-2);
+  margin-top: 3px;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: rgba(150, 210, 255, 0.45);
+  text-transform: uppercase;
 }
 
 .hud-search {
@@ -1241,6 +1246,12 @@ canvas {
   border-color: rgba(0, 210, 255, 0.2);
 }
 
+.event-count-chip {
+  color: rgba(167, 139, 250, 0.8);
+  border-color: rgba(167, 139, 250, 0.15);
+  background: rgba(167, 139, 250, 0.06);
+}
+
 .live-dot {
   width: 8px;
   height: 8px;
@@ -1401,10 +1412,12 @@ canvas {
 
 .control-group h3 {
   margin: 0 0 10px;
-  color: var(--text);
+  padding-left: 9px;
+  border-left: 2px solid rgba(0, 210, 255, 0.55);
+  color: rgba(200, 235, 255, 0.85);
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
 }
 
 .pill-row,
@@ -2068,6 +2081,38 @@ canvas {
   color: var(--muted);
 }
 
+.tooltip-article-hint {
+  display: block;
+  margin-top: 4px;
+  font: 500 0.58rem "Share Tech Mono", monospace;
+  color: rgba(0, 210, 255, 0.7);
+  letter-spacing: 0.04em;
+}
+
+.tooltip-lang {
+  display: inline-block;
+  margin-top: 4px;
+  margin-right: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 230, 255, 0.08);
+  border: 1px solid rgba(0, 230, 255, 0.2);
+  font: 700 0.5rem "Share Tech Mono", monospace;
+  color: var(--cyan);
+}
+
+.entity-lang-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 230, 255, 0.08);
+  border: 1px solid rgba(0, 230, 255, 0.2);
+  font: 700 0.55rem "Share Tech Mono", monospace;
+  color: var(--cyan);
+  vertical-align: middle;
+}
+
 .intel-sheet {
   position: absolute;
   top: 86px;
@@ -2233,6 +2278,44 @@ canvas {
   gap: 4px;
 }
 
+/* Ticker row wraps headline + language toggle button */
+.ticker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ticker-row .live-news-headline {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticker-lang-btn {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 230, 255, 0.28);
+  background: rgba(0, 230, 255, 0.07);
+  color: var(--cyan);
+  font: 700 0.56rem "Share Tech Mono", monospace;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+
+.ticker-lang-btn:hover {
+  background: rgba(0, 230, 255, 0.16);
+  border-color: rgba(0, 230, 255, 0.55);
+}
+
+.ticker-lang-btn.showing-original {
+  color: rgba(255, 190, 70, 0.9);
+  border-color: rgba(255, 190, 70, 0.35);
+  background: rgba(255, 190, 70, 0.07);
+}
+
 .live-news-headline {
   display: block;
   max-width: 100%;
@@ -2280,7 +2363,9 @@ canvas {
 
 .live-caption {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.6rem;
+  opacity: 0.65;
+  letter-spacing: 0.02em;
 }
 
 .timeline-title {
@@ -2377,7 +2462,6 @@ body.compact-ui .control-group + .control-group {
   }
 
   #floating-summary,
-  #hud-top,
   #hud-bottom,
   #map-legend {
     position: static;
@@ -2387,6 +2471,19 @@ body.compact-ui .control-group + .control-group {
     margin: 12px auto;
   }
 
+  /* Keep the top header pinned while scrolling in narrow viewports */
+  #hud-top {
+    position: sticky;
+    top: 14px; /* just below the 14px fixed classification bar */
+    z-index: 25;
+    transform: none;
+    width: min(100%, calc(100vw - 24px));
+    min-width: 0;
+    margin: 0 auto 12px;
+    max-height: calc(100vh - 28px);
+    overflow-y: auto;
+  }
+
   #app {
     position: relative;
     z-index: 2;
@@ -2394,7 +2491,7 @@ body.compact-ui .control-group + .control-group {
     flex-direction: column;
     gap: 0;
     min-height: 100vh;
-    padding: 12px;
+    padding: 26px 12px 12px; /* top accounts for 14px classification bar */
   }
 
   #cesiumContainer {
@@ -2497,10 +2594,16 @@ body.compact-ui .control-group + .control-group {
 
 @media (max-width: 680px) {
   #app {
-    padding: 8px;
+    padding: 22px 8px 8px; /* top accounts for 14px classification bar */
   }
 
-  #hud-top,
+  #hud-top {
+    margin: 0 auto 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-radius: 18px;
+  }
+
   #hud-bottom,
   #panel-layers,
   #panel-right,
@@ -2590,12 +2693,15 @@ body.compact-ui .control-group + .control-group {
   transform: translateY(-2px);
 }
 .news-toggle-icon {
-  font-size: 1.25rem;
+  font-size: 0.9rem;
   line-height: 1;
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
 }
 .news-toggle-label {
   font-size: 0.55rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
+  font-family: "Share Tech Mono", monospace;
 }
 .news-toggle-badge {
   position: absolute;
@@ -2935,6 +3041,48 @@ body.compact-ui .control-group + .control-group {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Title row: headline text + language badge */
+.news-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  overflow: hidden;
+}
+
+.news-card-title-row .news-card-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-lang-tag {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 230, 255, 0.25);
+  background: rgba(0, 230, 255, 0.06);
+  color: var(--cyan);
+  font: 700 0.54rem "Share Tech Mono", monospace;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  line-height: 1.5;
+  margin-top: 1px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.card-lang-tag:hover {
+  background: rgba(0, 230, 255, 0.15);
+  border-color: rgba(0, 230, 255, 0.5);
+}
+
+.card-lang-tag.showing-original {
+  color: rgba(255, 190, 70, 0.9);
+  border-color: rgba(255, 190, 70, 0.35);
+  background: rgba(255, 190, 70, 0.07);
+}
+
 .news-card-title {
   font: 600 0.76rem var(--font-main);
   color: var(--text);
@@ -3481,9 +3629,9 @@ body.compact-ui .control-group + .control-group {
 
 .drag-label {
   flex: 1;
-  font: 600 0.6rem "Share Tech Mono", monospace;
-  letter-spacing: 0.16em;
-  color: var(--muted-2);
+  font: 600 0.62rem "Share Tech Mono", monospace;
+  letter-spacing: 0.22em;
+  color: rgba(140, 200, 240, 0.7);
   text-transform: uppercase;
 }
 
@@ -3580,9 +3728,16 @@ body.compact-ui .control-group + .control-group {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   z-index: 110;
   pointer-events: none;
+  /* subtle backdrop so it's visible against any globe background */
+  padding: 4px 8px;
+  border-radius: 14px;
+  background: rgba(2, 6, 14, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 210, 255, 0.07);
 }
 
 .panel-restore-btn {
@@ -3732,7 +3887,29 @@ body.compact-ui .control-group + .control-group {
   font: 400 0.62rem "Share Tech Mono", monospace;
   color: rgba(0, 210, 255, 0.6);
   letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.clp-copy-btn {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  padding: 2px 8px;
   margin-bottom: 6px;
+  border: 1px solid rgba(0, 210, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(0, 210, 255, 0.06);
+  color: rgba(0, 210, 255, 0.65);
+  font: 700 0.5rem "Share Tech Mono", monospace;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.clp-copy-btn:hover {
+  background: rgba(0, 210, 255, 0.14);
+  color: var(--cyan);
+  border-color: rgba(0, 210, 255, 0.4);
 }
 
 .clp-loading {
@@ -4228,17 +4405,18 @@ body.compact-ui .control-group + .control-group {
 .footer-signals {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .footer-signal {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-family: var(--font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  color: var(--muted-2);
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  color: rgba(100, 140, 180, 0.7);
+  opacity: 0.85;
 }
 
 .footer-signal-icon {
@@ -4252,12 +4430,36 @@ body.compact-ui .control-group + .control-group {
 .footer-signal-icon.amber { background: var(--threat-med); box-shadow: 0 0 6px rgba(255, 159, 67, 0.4); }
 .footer-signal-icon.red { background: var(--threat-high); box-shadow: 0 0 6px rgba(255, 77, 109, 0.4); }
 
+/* ── Classification Bar ─────────────────────────────────────────────────── */
+.classification-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, rgba(0, 30, 50, 0.6), rgba(0, 20, 40, 0.4), rgba(0, 30, 50, 0.6));
+  border-bottom: 1px solid rgba(0, 210, 255, 0.07);
+  color: rgba(100, 190, 240, 0.4);
+  font: 400 0.42rem "Share Tech Mono", monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Presence indicator */
 .presence-indicator {
   font-size: 0.58rem;
   color: var(--muted-2);
   opacity: 0.7;
   transition: color 0.4s ease, opacity 0.4s ease;
+  letter-spacing: 0.08em;
 }
 .presence-indicator.connected {
   color: var(--threat-low);

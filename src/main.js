@@ -1480,6 +1480,14 @@ function pruneEventVisuals(forceTrim = false) {
     viewer.entities.remove(oldest.cone);
     viewer.entities.remove(oldest.trail);
   }
+  updateEventCount();
+}
+
+function updateEventCount() {
+  const el = document.getElementById("hud-event-count");
+  if (!el) return;
+  const n = dynamic.eventVisuals.length;
+  el.textContent = n > 0 ? `${n} events` : "— events";
 }
 
 function pickNewsLabel() {
@@ -1496,6 +1504,14 @@ function refreshEventVisualLabels() {
     const newsItem = pickNewsLabel();
     if (!newsItem) continue;
     const headline = newsItem.title.slice(0, 80);
+    const aUrl = newsItem.url || "";
+    const aLang = newsItem.language || "";
+    const aDomain = newsItem.domain || "";
+    for (const ent of [item.dot, item.cone, item.trail]) {
+      ent.properties.articleUrl    = aUrl;
+      ent.properties.articleLang   = aLang;
+      ent.properties.articleDomain = aDomain;
+    }
     item.dot.properties.label       = `${headline} marker`;
     item.dot.properties.description = `${newsItem.domain} — ${newsItem.title}`;
     item.cone.properties.label       = `${headline} cone`;
@@ -1534,6 +1550,8 @@ function spawnEventVisualBurst() {
   const eventLabel = newsItem
     ? newsItem.title.slice(0, 80)
     : (source.title || source.label || "Event");
+  const articleUrl = newsItem?.url || "";
+  const articleLang = newsItem?.language || "";
 
   const dot = viewer.entities.add({
     position: Cesium.Cartesian3.fromDegrees(lng, lat, 1200),
@@ -1548,7 +1566,10 @@ function spawnEventVisualBurst() {
       layerId: "incidents",
       entityType: "event-visual",
       label: `${eventLabel} marker`,
-      description: newsItem ? `${newsItem.domain} — ${newsItem.title}` : "Ephemeral conflict marker"
+      description: newsItem ? `${newsItem.domain} — ${newsItem.title}` : "Ephemeral conflict marker",
+      articleUrl,
+      articleLang,
+      articleDomain: newsItem?.domain || ""
     }
   });
 
@@ -1567,7 +1588,10 @@ function spawnEventVisualBurst() {
       layerId: "incidents",
       entityType: "event-cone",
       label: `${eventLabel} cone`,
-      description: newsItem ? `${newsItem.domain} — projection` : "Ephemeral event projection cone"
+      description: newsItem ? `${newsItem.domain} — projection` : "Ephemeral event projection cone",
+      articleUrl,
+      articleLang,
+      articleDomain: newsItem?.domain || ""
     }
   });
 
@@ -1585,7 +1609,10 @@ function spawnEventVisualBurst() {
       layerId: "incidents",
       entityType: "event-trail",
       label: `${eventLabel} trail`,
-      description: newsItem ? `${newsItem.domain} — trajectory` : "Ephemeral event trajectory"
+      description: newsItem ? `${newsItem.domain} — trajectory` : "Ephemeral event trajectory",
+      articleUrl,
+      articleLang,
+      articleDomain: newsItem?.domain || ""
     }
   });
 
@@ -1598,6 +1625,7 @@ function spawnEventVisualBurst() {
   });
 
   pruneEventVisuals();
+  updateEventCount();
 }
 
 function startEventVisualLifecycle() {
@@ -1929,7 +1957,7 @@ function openIntelSheet(entity) {
   const now = new Date();
   elements.intelSheetTelemetry.innerHTML = `
     <div>${info.locationMeta}</div>
-    <div>Altitude: ${Math.round(info.altitude).toLocaleString()} m</div>
+    <div>Altitude: ${info.altitude > 0 ? Math.round(info.altitude).toLocaleString() + ' m' : '—'}</div>
     <div>Status: LIVE MONITORING</div>
     <div>Class: ${info.synthetic ? "Auxiliary model track" : "Primary track"}</div>
   `;
@@ -1947,8 +1975,8 @@ function openIntelSheet(entity) {
     { kicker: "Next", copy: "Continue monitoring \u2014 auto-refresh active" }
   ].map(item => `
     <div class="intel-timeline-item">
-      <strong>${item.kicker}</strong>
-      <span>${item.copy}</span>
+      <strong>${escapeHtml(item.kicker)}</strong>
+      <span>${escapeHtml(item.copy)}</span>
     </div>
   `).join("");
 }
@@ -2217,9 +2245,12 @@ function getEntityInfo(entity) {
     const cg = Cesium.Cartographic.fromCartesian(position);
     locationMeta = `${Cesium.Math.toDegrees(cg.latitude).toFixed(2)}\u00b0, ${Cesium.Math.toDegrees(cg.longitude).toFixed(2)}\u00b0`;
   }
-  const altitude  = props?.altitude?.getValue?.(viewer.clock.currentTime) ?? 0;
-  const synthetic = !!props?.synthetic?.getValue?.(viewer.clock.currentTime);
-  return { label, description, type, locationMeta, altitude, synthetic, entityId: entity.id };
+  const altitude    = props?.altitude?.getValue?.(viewer.clock.currentTime) ?? 0;
+  const synthetic   = !!props?.synthetic?.getValue?.(viewer.clock.currentTime);
+  const articleUrl  = props?.articleUrl?.getValue?.(viewer.clock.currentTime) ?? "";
+  const articleLang = props?.articleLang?.getValue?.(viewer.clock.currentTime) ?? "";
+  const articleDomain = props?.articleDomain?.getValue?.(viewer.clock.currentTime) ?? "";
+  return { label, description, type, locationMeta, altitude, synthetic, entityId: entity.id, articleUrl, articleLang, articleDomain };
 }
 
 function hideHoverTooltip() { elements.hoverTooltip.classList.add("hidden"); }
@@ -2227,10 +2258,18 @@ function hideHoverTooltip() { elements.hoverTooltip.classList.add("hidden"); }
 function showHoverTooltip(entity, screenPosition) {
   const info = getEntityInfo(entity);
   if (!info) { hideHoverTooltip(); return; }
+  const isEvent = info.type === "event-visual" || info.type === "event-cone" || info.type === "event-trail";
+  const articleLine = isEvent && info.articleUrl
+    ? `<span class="tooltip-article-hint">${escapeHtml(info.articleDomain || "Source article")} ↗</span>`
+    : "";
+  const langLine = isEvent && info.articleLang && isNonEnglish(info.articleLang)
+    ? `<span class="tooltip-lang">${escapeHtml(langDisplayName(info.articleLang))}</span>`
+    : "";
   elements.hoverTooltip.innerHTML = `
-    <strong>${info.label}</strong>
-    <span>${info.type.toUpperCase()}</span>
-    <p>${info.description || info.locationMeta}</p>
+    <strong>${escapeHtml(info.label)}</strong>
+    <span>${escapeHtml(info.type.toUpperCase())}</span>
+    <p>${escapeHtml(info.description || info.locationMeta)}</p>
+    ${langLine}${articleLine}
   `;
   elements.hoverTooltip.style.left = `${screenPosition.x + 18}px`;
   elements.hoverTooltip.style.top  = `${screenPosition.y + 18}px`;
@@ -2245,30 +2284,41 @@ function updateSelectedEntityCard(entity) {
     return;
   }
   elements.entityInfo.classList.remove("empty");
-  const { label, description, type, locationMeta, altitude, synthetic, entityId } = getEntityInfo(entity);
+  const { label, description, type, locationMeta, altitude, synthetic, entityId, articleUrl, articleLang, articleDomain } = getEntityInfo(entity);
   const incident = type === "incident" ? findScenarioIncidentById(entityId) : null;
   const incidentNarrative = incident ? getActiveIncidentNarrative(incident) : null;
   const effectiveDescription = incidentNarrative?.description ?? description;
-  const sourceMarkup = incidentNarrative?.sourceUrl
-    ? `<a class="entity-source-link" href="${escapeHtml(incidentNarrative.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(incidentNarrative.sourceLabel || "Source article")} ↗</a>`
-    : incidentNarrative?.sourceLabel
-      ? `<span class="entity-source-text">${escapeHtml(incidentNarrative.sourceLabel)}</span>`
+
+  // Article source link — from scenario incidents OR from event-visual news links
+  const isEventVisual = type === "event-visual" || type === "event-cone" || type === "event-trail";
+  let sourceMarkup;
+  if (incidentNarrative?.sourceUrl) {
+    sourceMarkup = `<a class="entity-source-link" href="${escapeHtml(incidentNarrative.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(incidentNarrative.sourceLabel || "Source article")} ↗</a>`;
+  } else if (incidentNarrative?.sourceLabel) {
+    sourceMarkup = `<span class="entity-source-text">${escapeHtml(incidentNarrative.sourceLabel)}</span>`;
+  } else if (isEventVisual && articleUrl) {
+    const langNote = articleLang && isNonEnglish(articleLang)
+      ? ` <span class="entity-lang-chip">${escapeHtml(langDisplayName(articleLang))}</span>`
       : "";
+    sourceMarkup = `<a class="entity-source-link" href="${escapeHtml(articleUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(articleDomain || "Read article")} ↗</a>${langNote}`;
+  } else {
+    sourceMarkup = "";
+  }
   elements.entityInfo.innerHTML = `
-    <strong>${label}</strong>
-    <div>${effectiveDescription}</div>
+    <strong>${escapeHtml(label)}</strong>
+    <div>${escapeHtml(effectiveDescription)}</div>
     ${sourceMarkup}
     <div class="entity-meta">
-      <span>${type.toUpperCase()}</span>
-      <span>${locationMeta}</span>
+      <span>${escapeHtml(type.toUpperCase())}</span>
+      <span>${escapeHtml(locationMeta)}</span>
     </div>
     <div class="entity-stats">
-      <span>ALT ${Math.round(altitude).toLocaleString()} m</span>
+      <span>ALT ${altitude > 0 ? Math.round(altitude).toLocaleString() + ' m' : '—'}</span>
       <span>${synthetic ? "AUX MODEL" : "PRIMARY TRACK"}</span>
       <span>LIVE</span>
     </div>
   `;
-  elements.entityInfo.onclick = () => openIntelSheet(entity);
+  elements.entityInfo.onclick = (e) => { if (e.target.closest('a')) return; openIntelSheet(entity); };
   updateTrackButtons();
 }
 
@@ -2610,6 +2660,20 @@ function initDraggablePanels() {
       });
       restoreStrip.appendChild(btn);
     });
+
+    // Also show restore button for the news panel if it was closed
+    const newsBriefing = document.getElementById("news-briefing");
+    if (newsBriefing && newsBriefing.classList.contains("hidden") && !state.newsOpen) {
+      const btn = document.createElement("button");
+      btn.className = "panel-restore-btn";
+      btn.textContent = "⊕ SIGNALS";
+      btn.title = "Restore news intelligence panel";
+      btn.addEventListener("click", () => {
+        toggleNewsPanel();
+        refreshRestoreStrip();
+      });
+      restoreStrip.appendChild(btn);
+    }
   }
 
   refreshPanelRestoreStrip = refreshRestoreStrip;
@@ -3451,6 +3515,17 @@ function registerEvents() {
   elements.closeIntelSheet?.addEventListener("click",    closeIntelSheet);
   elements.clpClose?.addEventListener("click",            hideClickLocationPopup);
   elements.ccbClose?.addEventListener("click",            hideClickLocationPopup);
+
+  // Copy coordinates button on the click-location popup
+  document.getElementById("clp-copy")?.addEventListener("click", () => {
+    const coords = elements.clpCoordsPopup?.textContent?.trim();
+    if (coords) {
+      navigator.clipboard.writeText(coords).then(() => {
+        const btn = document.getElementById("clp-copy");
+        if (btn) { btn.textContent = "✓ COPIED"; setTimeout(() => { btn.textContent = "⎘ COPY"; }, 1500); }
+      }).catch(() => {});
+    }
+  });
   elements.mobileBackdrop?.addEventListener("click",     () => { setMobileDrawer(null); closeIntelSheet(); });
   elements.btnMobileLayers?.addEventListener("click",    () => setMobileDrawer("layers"));
   elements.btnMobileControls?.addEventListener("click",  () => setMobileDrawer("controls"));
@@ -3631,6 +3706,8 @@ function registerEvents() {
     if (event.key.toLowerCase() === "i") { if (state.selectedEntity) openIntelSheet(state.selectedEntity); return; }
     if (event.key.toLowerCase() === "h") { navFlyHome(); return; }
     if (event.key.toLowerCase() === "j") { focusNextHotspot(); return; }
+    if (event.key === "+" || event.key === "=") { document.getElementById("nav-zoom-in")?.click(); return; }
+    if (event.key === "-" || event.key === "_") { document.getElementById("nav-zoom-out")?.click(); return; }
     if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); closeNewsPanel(); }
   });
 
@@ -3794,6 +3871,7 @@ function openNewsPanel() {
   } else {
     renderNewsCards(state.newsArticles);
   }
+  if (typeof refreshPanelRestoreStrip === "function") refreshPanelRestoreStrip();
 }
 
 function closeNewsPanel() {
@@ -3802,6 +3880,7 @@ function closeNewsPanel() {
   elements.newsBriefing?.classList.add("hidden");
   elements.newsToggleBtn?.classList.remove("active");
   stopNewsCategoryRotation();
+  if (typeof refreshPanelRestoreStrip === "function") refreshPanelRestoreStrip();
 }
 
 async function switchNewsCategory(catId) {
@@ -3986,16 +4065,77 @@ function buildNewsCard(article, cat, index) {
   meta.appendChild(catChip);
   meta.appendChild(outlet);
 
-  const title = document.createElement("div");
+  const titleRow = document.createElement("div");
+  titleRow.className = "news-card-title-row";
+
+  const title = document.createElement("span");
   title.className = "news-card-title";
-  title.textContent = article.title;
+
+  const lang = article.language;
+  const nonEng = isNonEnglish(lang);
+  const cacheKey = nonEng ? `${lang}::${article.title}` : null;
+  const cachedTranslation = cacheKey ? _translationCache.get(cacheKey) : undefined;
+
+  if (nonEng) {
+    const showingTranslated = cachedTranslation && cachedTranslation !== article.title && !article._cardShowOriginal;
+    title.textContent = showingTranslated ? cachedTranslation : article.title;
+
+    const langTag = document.createElement("button");
+    langTag.type = "button";
+    langTag.className = "card-lang-tag";
+    const lname = langDisplayName(lang);
+    if (article._cardShowOriginal || !showingTranslated) {
+      langTag.textContent = lang.slice(0, 3).toUpperCase();
+      langTag.title = cachedTranslation
+        ? `Translated from ${lname} · click to show translation`
+        : `Source language: ${lname}`;
+      if (article._cardShowOriginal) langTag.classList.add("showing-original");
+    } else {
+      langTag.textContent = lang.slice(0, 3).toUpperCase();
+      langTag.title = `Translated from ${lname} · click to show original`;
+    }
+
+    langTag.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      article._cardShowOriginal = !article._cardShowOriginal;
+      if (article._cardShowOriginal) {
+        title.textContent = article.title;
+        langTag.textContent = "EN";
+        langTag.title = `Show English translation (from ${lname})`;
+        langTag.classList.add("showing-original");
+      } else {
+        const latest = _translationCache.get(cacheKey);
+        title.textContent = (latest && latest !== article.title) ? latest : article.title;
+        langTag.textContent = lang.slice(0, 3).toUpperCase();
+        langTag.title = `Translated from ${lname} · click to show original`;
+        langTag.classList.remove("showing-original");
+      }
+    };
+
+    titleRow.appendChild(title);
+    titleRow.appendChild(langTag);
+
+    // Async translate if not already cached
+    if (!cachedTranslation) {
+      translateTitle(article.title, lang).then(translated => {
+        if (translated && translated !== article.title && !article._cardShowOriginal) {
+          title.textContent = translated;
+          langTag.title = `Translated from ${lname} · click to show original`;
+        }
+      });
+    }
+  } else {
+    title.textContent = article.title;
+    titleRow.appendChild(title);
+  }
 
   const time = document.createElement("div");
   time.className = "news-card-time";
   time.textContent = `${article.relativeTime}${article.country ? ` · ${article.country}` : ""}`;
 
   body.appendChild(meta);
-  body.appendChild(title);
+  body.appendChild(titleRow);
   body.appendChild(time);
 
   a.appendChild(thumbWrap);
@@ -4018,6 +4158,23 @@ function setNewsTickerPool(items) {
   state.newsTickerPool = deduped.slice(0, 24);
   state.newsTickerIndex = 0;
   renderNewsTickerHeadline();
+
+  // Pre-translate non-English articles in background so they're ready when displayed
+  preTranslatePool(state.newsTickerPool);
+}
+
+/** Fire-and-forget: translate up to 8 non-English titles ahead of time */
+function preTranslatePool(pool) {
+  let queued = 0;
+  for (const item of pool) {
+    if (queued >= 8) break;
+    if (!item.language || !isNonEnglish(item.language)) continue;
+    const cacheKey = `${item.language}::${item.title}`;
+    if (_translationCache.has(cacheKey)) continue;
+    queued++;
+    // Stagger requests to avoid rate-limiting (200ms apart)
+    setTimeout(() => translateTitle(item.title, item.language), queued * 200);
+  }
 }
 
 function startNewsTicker() {
@@ -4054,18 +4211,123 @@ function rotateToNextNewsCategory() {
   switchNewsCategory(nextCategory.id);
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   TRANSLATION LAYER  (MyMemory free tier — no key required)
+   ══════════════════════════════════════════════════════════════════════════ */
+const _translationCache = new Map(); // key: `${langCode}::${text}` → translated string
+
+let _langNames;
+try {
+  _langNames = new Intl.DisplayNames(["en"], { type: "language" });
+} catch (_) {
+  _langNames = null;
+}
+
+function langDisplayName(code) {
+  if (!code) return code;
+  try {
+    const name = _langNames?.of(code);
+    if (name && name !== code) return name;
+  } catch (_) { /* ignore */ }
+  // fallback: capitalize the code
+  return code.toUpperCase();
+}
+
+function isNonEnglish(langCode) {
+  if (!langCode) return false;
+  const lc = langCode.toLowerCase();
+  return lc !== "en" && lc !== "eng" && lc !== "english";
+}
+
+/**
+ * Translate a single title via MyMemory (free, no key).
+ * Returns the translated string, or the original if translation fails/matches.
+ * Results are cached in-memory.
+ */
+async function translateTitle(text, fromLang) {
+  if (!text || !fromLang || !isNonEnglish(fromLang)) return text;
+  const cacheKey = `${fromLang}::${text}`;
+  if (_translationCache.has(cacheKey)) return _translationCache.get(cacheKey);
+
+  try {
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(fromLang)}|en`;
+    const signal = AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined;
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const translated = data?.responseData?.translatedText;
+    if (translated && translated !== text && !translated.includes("MYMEMORY WARNING")) {
+      _translationCache.set(cacheKey, translated);
+      return translated;
+    }
+  } catch (_) { /* silently fall back */ }
+  _translationCache.set(cacheKey, text); // cache original to avoid re-fetching
+  return text;
+}
+
 function renderNewsTickerHeadline(animate = false) {
   const el = elements.liveNewsHeadline;
+  const langBtn = document.getElementById("ticker-lang-btn");
   if (!el) return;
+
   if (!state.newsTickerPool.length) {
     el.href = "https://www.gdeltproject.org";
-    el.textContent = "🛰 Live headlines initializing…";
+    el.textContent = "◉ Initializing signal feed…";
+    if (langBtn) langBtn.hidden = true;
     return;
   }
 
   const item = state.newsTickerPool[state.newsTickerIndex] ?? state.newsTickerPool[0];
   el.href = item.url;
-  el.textContent = `🛰 ${item.title}`;
+
+  const lang = item.language;
+  const nonEng = isNonEnglish(lang);
+
+  if (nonEng) {
+    const cacheKey = `${lang}::${item.title}`;
+    const cached = _translationCache.get(cacheKey);
+
+    if (cached !== undefined && cached !== item.title) {
+      // We have a translation ready
+      const showOrig = item._tickerShowOriginal;
+      el.textContent = `◉ ${showOrig ? item.title : cached}`;
+
+      if (langBtn) {
+        langBtn.hidden = false;
+        const lname = langDisplayName(lang);
+        if (showOrig) {
+          langBtn.textContent = "EN";
+          langBtn.title = "Show English translation";
+          langBtn.classList.add("showing-original");
+        } else {
+          langBtn.textContent = lang.slice(0, 3).toUpperCase();
+          langBtn.title = `Translated from ${lname} · click to show original`;
+          langBtn.classList.remove("showing-original");
+        }
+        langBtn.onclick = () => {
+          item._tickerShowOriginal = !item._tickerShowOriginal;
+          renderNewsTickerHeadline(false);
+        };
+      }
+    } else {
+      // No translation yet — show original while we fetch
+      el.textContent = `◉ ${item.title}`;
+      if (langBtn) langBtn.hidden = true;
+      translateTitle(item.title, lang).then(translated => {
+        if (translated && translated !== item.title) {
+          // Re-render only if this is still the current item
+          const cur = state.newsTickerPool[state.newsTickerIndex] ?? state.newsTickerPool[0];
+          if (cur?.url === item.url && !item._tickerShowOriginal) {
+            renderNewsTickerHeadline(false);
+          }
+        }
+      });
+    }
+  } else {
+    el.textContent = `◉ ${item.title}`;
+    if (langBtn) langBtn.hidden = true;
+  }
+
   if (animate) {
     el.classList.remove("updating");
     void el.offsetWidth;
@@ -4314,7 +4576,7 @@ function updatePresenceIndicator() {
   const peerCount = getPresencePeers().size;
   el.classList.toggle("connected", connected);
   el.textContent = connected
-    ? `${peerCount + 1} operator${peerCount + 1 !== 1 ? "s" : ""} online`
-    : "Presence offline";
+    ? `NET COMMS: ${peerCount + 1} ACTIVE`
+    : "NET COMMS: OFFLINE";
 }
 

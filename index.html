@@ -62,6 +62,7 @@
     <div class="clp-country decrypt-text" id="clp-country">Scanning…</div>
     <div class="clp-region decrypt-text" id="clp-region"></div>
     <div class="clp-coords" id="clp-coords-popup"></div>
+    <button class="clp-copy-btn" id="clp-copy" type="button" title="Copy coordinates">⎘ COPY</button>
     <div class="clp-loading" id="clp-loading"><span class="clp-spinner"></span> Geocoding…</div>
   </div>
 
@@ -113,6 +114,7 @@
   </div>
 
   <div id="app">
+    <div id="classification-bar" class="classification-bar" aria-hidden="true">UNCLASSIFIED // FOR OFFICIAL USE ONLY // OPEN SOURCE INTELLIGENCE // PANOPTICON-EARTH</div>
     <div id="cesiumContainer"></div>
     <div class="ambient-scanline" aria-hidden="true"></div>
     <div class="data-pulse-ring" aria-hidden="true"></div>
@@ -386,6 +388,7 @@
         <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-mode">LIVE FEED</span></span>
         <span id="hud-track-count" class="hud-chip">— tracks</span>
         <span id="hud-alert-count" class="hud-chip">— alerts</span>
+        <span id="hud-event-count" class="hud-chip event-count-chip">— events</span>
         <div class="data-throughput" id="data-throughput" title="Data throughput">
           <div class="throughput-bars" id="throughput-bars">
             <span class="throughput-bar" style="height:4px"></span>
@@ -402,7 +405,10 @@
         <span class="timeline-title" id="live-region-label">Global Surveillance Active</span>
         <span id="live-last-refresh" class="live-caption">Feeds refreshing…</span>
         <span id="live-next-refresh" class="live-caption">Next refresh in --s</span>
-        <a id="live-news-headline" class="live-news-headline" href="https://www.gdeltproject.org" target="_blank" rel="noopener noreferrer">🛰 Live headlines initializing…</a>
+        <div class="ticker-row">
+          <a id="live-news-headline" class="live-news-headline" href="https://www.gdeltproject.org" target="_blank" rel="noopener noreferrer">◉ Initializing signal feed…</a>
+          <button id="ticker-lang-btn" class="ticker-lang-btn" hidden type="button"></button>
+        </div>
       </div>
       <div id="live-status-right">
         <span id="presence-indicator" class="hud-chip presence-indicator">Presence offline</span>
@@ -512,8 +518,8 @@
 
   <!-- News trigger button (fixed bottom-right of globe) -->
   <button id="btn-news-toggle" class="news-toggle-btn" type="button" title="Live News Briefing">
-    <span class="news-toggle-icon">📡</span>
-    <span class="news-toggle-label">NEWS</span>
+    <span class="news-toggle-icon" aria-hidden="true">◉</span>
+    <span class="news-toggle-label">SIGNALS</span>
     <span class="news-toggle-badge hidden" id="news-badge">0</span>
   </button>
 
