@@ -28,9 +28,9 @@
             <circle cx="60" cy="60" r="10" fill="url(#bootGrad)" opacity="0.7"/>
             <defs>
               <linearGradient id="bootGrad" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#7ee0ff"/>
-                <stop offset="50%" stop-color="#af9dff"/>
-                <stop offset="100%" stop-color="#ff6d8d"/>
+                <stop offset="0%" stop-color="#00d4ff"/>
+                <stop offset="50%" stop-color="#a78bfa"/>
+                <stop offset="100%" stop-color="#ff4d6d"/>
               </linearGradient>
             </defs>
           </svg>
@@ -114,6 +114,10 @@
 
   <div id="app">
     <div id="cesiumContainer"></div>
+    <div class="ambient-scanline" aria-hidden="true"></div>
+    <div class="data-pulse-ring" aria-hidden="true"></div>
+    <div class="data-pulse-ring" aria-hidden="true"></div>
+    <div class="data-pulse-ring" aria-hidden="true"></div>
     <div class="console-frame" aria-hidden="true">
       <div class="console-frame-inner"></div>
       <div class="console-side console-side-left">
@@ -172,6 +176,17 @@
         <span id="hud-utc">UTC --:--:--</span>
         <span class="hud-divider">|</span>
         <span id="hud-local">LOCAL --:--:--</span>
+      </div>
+
+      <div class="threat-level-bar" id="threat-level-bar" title="Global threat assessment">
+        <span class="threat-label">THREAT</span>
+        <div class="threat-segments" id="threat-segments">
+          <span class="threat-seg"></span><span class="threat-seg"></span><span class="threat-seg"></span>
+          <span class="threat-seg"></span><span class="threat-seg"></span><span class="threat-seg"></span>
+          <span class="threat-seg"></span><span class="threat-seg"></span><span class="threat-seg"></span>
+          <span class="threat-seg"></span>
+        </div>
+        <span class="threat-value" id="threat-value">0</span>
       </div>
 
       <div class="hud-right">
@@ -343,6 +358,13 @@
       </div>
       <p id="summary-copy">A map-first view of movement, alerts, and regional context.</p>
       <div id="summary-tags" class="summary-tags"></div>
+      <div id="summary-actions" class="summary-actions">
+        <button id="summary-hotspot" class="panel-btn primary" type="button">Hotspot</button>
+        <button id="summary-random" class="panel-btn" type="button">Random Track</button>
+        <button id="summary-news" class="panel-btn" type="button">News</button>
+        <button id="summary-guide" class="panel-btn" type="button">Guide</button>
+      </div>
+      <p id="summary-hint" class="summary-hint">Use / to search, or start with a hotspot jump.</p>
     </section>
 
     <section id="map-legend" class="glass-panel draggable-panel">
@@ -364,6 +386,17 @@
         <span class="hud-chip hud-live"><span class="live-dot"></span><span id="hud-status-mode">LIVE FEED</span></span>
         <span id="hud-track-count" class="hud-chip">— tracks</span>
         <span id="hud-alert-count" class="hud-chip">— alerts</span>
+        <div class="data-throughput" id="data-throughput" title="Data throughput">
+          <div class="throughput-bars" id="throughput-bars">
+            <span class="throughput-bar" style="height:4px"></span>
+            <span class="throughput-bar" style="height:6px"></span>
+            <span class="throughput-bar" style="height:8px"></span>
+            <span class="throughput-bar" style="height:5px"></span>
+            <span class="throughput-bar" style="height:10px"></span>
+            <span class="throughput-bar" style="height:7px"></span>
+          </div>
+          <span class="throughput-value" id="throughput-value">0 B/s</span>
+        </div>
       </div>
       <div id="live-status-center">
         <span class="timeline-title" id="live-region-label">Global Surveillance Active</span>
@@ -372,6 +405,11 @@
         <a id="live-news-headline" class="live-news-headline" href="https://www.gdeltproject.org" target="_blank" rel="noopener noreferrer">🛰 Live headlines initializing…</a>
       </div>
       <div id="live-status-right">
+        <div class="footer-signals" id="footer-signals">
+          <span class="footer-signal"><span class="footer-signal-icon green" id="sig-adsb"></span>ADS-B</span>
+          <span class="footer-signal"><span class="footer-signal-icon green" id="sig-news"></span>NEWS</span>
+          <span class="footer-signal"><span class="footer-signal-icon amber" id="sig-ais"></span>AIS</span>
+        </div>
         <button id="refresh-now" class="transport-btn" type="button">Refresh Now</button>
         <button id="btn-fullscreen" class="transport-btn" type="button">Fullscreen</button>
       </div>

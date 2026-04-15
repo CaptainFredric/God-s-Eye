@@ -23,6 +23,8 @@ const UI_STORAGE_KEYS = {
   onboardingSeen: "panopticon-earth-onboarding-seen"
 };
 
+const BOOT_SESSION_KEY = "panopticon-earth-boot-seen";
+
 const PANEL_IDS = ["panel-layers", "panel-right", "floating-summary", "map-legend"];
 
 const CAMERA_PRESETS = [
@@ -167,6 +169,13 @@ const state = {
 
 const elements = {};
 let refreshPanelRestoreStrip = () => {};
+const sparklineData = {
+  tracks: [],
+  alerts: [],
+  orbits: [],
+  feeds: []
+};
+const SPARKLINE_MAX_POINTS = 12;
 const dynamic = {
   trails:      [],
   zones:       [],
@@ -248,6 +257,7 @@ seedScene();
 renderFeedStatus();
 renderTrustIndicators();
 registerEvents();
+updateSummaryHint();
 updateOperationsControls();
 elements.btnSpin.classList.toggle("active", state.spinning);
 startHudClock();
@@ -370,6 +380,11 @@ function cacheElements() {
     summaryTime:         document.getElementById("summary-time"),
     summaryCopy:         document.getElementById("summary-copy"),
     summaryTags:         document.getElementById("summary-tags"),
+    summaryHotspot:      document.getElementById("summary-hotspot"),
+    summaryRandom:       document.getElementById("summary-random"),
+    summaryNews:         document.getElementById("summary-news"),
+    summaryGuide:        document.getElementById("summary-guide"),
+    summaryHint:         document.getElementById("summary-hint"),
     hudStatusMode:       document.getElementById("hud-status-mode"),
     hudTrackCount:       document.getElementById("hud-track-count"),
     hudAlertCount:       document.getElementById("hud-alert-count"),
@@ -456,7 +471,14 @@ function cacheElements() {
     newsRefreshBtn:      document.getElementById("news-refresh"),
     newsCloseBtn:        document.getElementById("news-close"),
     newsToggleBtn:       document.getElementById("btn-news-toggle"),
-    newsBadge:           document.getElementById("news-badge")
+    newsBadge:           document.getElementById("news-badge"),
+    threatSegments:      document.getElementById("threat-segments"),
+    threatValue:         document.getElementById("threat-value"),
+    throughputBars:      document.getElementById("throughput-bars"),
+    throughputValue:     document.getElementById("throughput-value"),
+    sigAdsb:             document.getElementById("sig-adsb"),
+    sigNews:             document.getElementById("sig-news"),
+    sigAis:              document.getElementById("sig-ais")
   });
 
   if (elements.fxIntensity)    elements.fxIntensity.value   = String(state.fxIntensity);
@@ -485,7 +507,10 @@ function normalizeBookmarks(bookmarks) {
 }
 
 function createDefaultPanelState() {
-  return Object.fromEntries(PANEL_IDS.map(id => [id, { hidden: false, minimized: false }]));
+  return Object.fromEntries(PANEL_IDS.map(id => [id, {
+    hidden: false,
+    minimized: id === "map-legend"
+  }]));
 }
 
 function normalizePanelState(panelState) {
@@ -744,6 +769,20 @@ function closeMissionGuide(markSeen = true) {
     state.onboardingSeen = true;
     saveJson(UI_STORAGE_KEYS.onboardingSeen, true);
   }
+  updateSummaryHint();
+}
+
+function updateSummaryHint() {
+  if (!elements.summaryHint) return;
+  if (!state.onboardingSeen) {
+    elements.summaryHint.textContent = "Start with Search or Hotspot. Guide stays available if you want a walkthrough.";
+    return;
+  }
+  if (window.innerWidth <= 980) {
+    elements.summaryHint.textContent = "Use Layers, Control, and Intel at the bottom to move through the map quickly.";
+    return;
+  }
+  elements.summaryHint.textContent = "Search, jump to a hotspot, or click the globe to inspect a region.";
 }
 
 function stepMissionGuide(direction) {
@@ -845,8 +884,9 @@ function renderMetricCluster() {
   elements.metricCluster.innerHTML = metrics.map(m => `
     <article class="metric-card" data-metric="${m.key}">
       <span class="metric-label">${m.label}</span>
-      <strong class="metric-value">${m.value}</strong>
+      <strong class="metric-value counting-value">${m.value}</strong>
       <span class="metric-foot">${m.foot}</span>
+      <div class="metric-sparkline" data-sparkline="${m.key}"></div>
     </article>
   `).join("");
 }
@@ -856,8 +896,17 @@ function updateMetricCard(key, value, foot) {
   if (!card) return;
   const v = card.querySelector(".metric-value");
   const f = card.querySelector(".metric-foot");
-  if (v) v.textContent = String(value);
+  if (v) {
+    const oldVal = parseInt(v.textContent, 10);
+    const newVal = parseInt(value, 10);
+    if (!isNaN(oldVal) && !isNaN(newVal) && oldVal !== newVal) {
+      animateCountTo(v, oldVal, newVal, 600);
+    } else {
+      v.textContent = String(value);
+    }
+  }
   if (f) f.textContent = foot;
+  updateSparkline(key, typeof value === "number" ? value : parseInt(value, 10) || 0);
 }
 
 function renderFeedStatus() {
@@ -2038,9 +2087,19 @@ function startBootIntro() {
   overlay.classList.remove("boot-fading");
   overlay.style.display = "";
 
+  const quickBoot = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    || window.sessionStorage.getItem(BOOT_SESSION_KEY) === "1";
+
+  if (quickBoot) {
+    fillEl.style.width = "100%";
+    statusEl.textContent = "● GOD'S EYE ONLINE";
+    finishBoot({ immediate: true });
+    return;
+  }
+
   let stepIdx = 0;
-  const STEP_DELAY = 310;
-  const bootTimeout = setTimeout(() => { finishBoot(); }, 15000);
+  const STEP_DELAY = 180;
+  const bootTimeout = setTimeout(() => { finishBoot(); }, 4800);
 
   function runStep() {
     if (stepIdx >= BOOT_STEPS.length) {
@@ -2054,12 +2113,35 @@ function startBootIntro() {
     setTimeout(runStep, STEP_DELAY);
   }
 
-  setTimeout(runStep, 420);
+  setTimeout(runStep, 140);
 }
 
-function finishBoot() {
+function finishBoot({ immediate = false } = {}) {
   const overlay = elements.bootOverlay;
   if (!overlay) return;
+
+  const finishOverlay = () => {
+    overlay.classList.add("boot-fading");
+    overlay.style.pointerEvents = "none";
+    document.body.classList.add("boot-complete");
+    pulseConsoleFrame("boot");
+    startAmbientUpdates();
+    updateSummaryHint();
+    try {
+      window.sessionStorage.setItem(BOOT_SESSION_KEY, "1");
+    } catch {
+      // Ignore unavailable session storage.
+    }
+    setTimeout(() => {
+      overlay.style.display = "none";
+      overlay.remove();
+    }, immediate ? 120 : 560);
+  };
+
+  if (immediate) {
+    finishOverlay();
+    return;
+  }
 
   const shutterTop    = overlay.querySelector(".boot-shutter-top");
   const shutterBottom = overlay.querySelector(".boot-shutter-bottom");
@@ -2073,25 +2155,13 @@ function finishBoot() {
       pitch:   STARTUP_VIEW.pitch,
       roll:    STARTUP_VIEW.roll
     },
-    duration: 1.4,
+    duration: 0.9,
     complete: () => {
       startGlobeSpinDown();
     }
   });
 
-  setTimeout(() => {
-    overlay.classList.add("boot-fading");
-    overlay.style.pointerEvents = "none";
-    document.body.classList.add("boot-complete");
-    pulseConsoleFrame("boot");
-    setTimeout(() => {
-      overlay.style.display = "none";
-      overlay.remove();
-      if (!state.onboardingSeen) {
-        window.setTimeout(() => openMissionGuide(0), 260);
-      }
-    }, 900);
-  }, 750);
+  setTimeout(finishOverlay, 320);
 }
 
 let _consolePulseTimer = null;
@@ -3022,6 +3092,10 @@ function registerEvents() {
   elements.testAisEndpoint?.addEventListener("click",    testAisEndpoint);
   elements.refreshNow?.addEventListener("click",         () => refreshLiveFeeds());
   elements.btnGuide?.addEventListener("click",           () => openMissionGuide(state.onboardingStep || 0));
+  elements.summaryGuide?.addEventListener("click",       () => openMissionGuide(state.onboardingStep || 0));
+  elements.summaryHotspot?.addEventListener("click",     focusNextHotspot);
+  elements.summaryRandom?.addEventListener("click",      focusRandomTrack);
+  elements.summaryNews?.addEventListener("click",        toggleNewsPanel);
   elements.missionGuideClose?.addEventListener("click",  () => closeMissionGuide(true));
   elements.missionGuideSkip?.addEventListener("click",   () => closeMissionGuide(true));
   elements.missionGuidePrev?.addEventListener("click",   () => stepMissionGuide(-1));
@@ -3204,6 +3278,7 @@ function registerEvents() {
   window.addEventListener("resize", () => {
     viewer.resize();
     if (window.innerWidth > 980) setMobileDrawer(null);
+    updateSummaryHint();
   });
 
   window.addEventListener("keydown", event => {
@@ -3615,3 +3690,121 @@ function escHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENHANCED LIVE DYNAMICS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// Animated number counter
+function animateCountTo(el, from, to, duration) {
+  if (!el) return;
+  const start = performance.now();
+  el.classList.add("updating");
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    el.textContent = String(Math.round(from + (to - from) * eased));
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      el.textContent = String(to);
+      el.classList.remove("updating");
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+function updateSparkline(key, value) {
+  if (!sparklineData[key]) return;
+  sparklineData[key].push(value);
+  if (sparklineData[key].length > SPARKLINE_MAX_POINTS) sparklineData[key].shift();
+  renderSparkline(key);
+}
+
+function renderSparkline(key) {
+  const container = document.querySelector(`[data-sparkline="${key}"]`);
+  if (!container) return;
+  const data = sparklineData[key];
+  if (data.length < 2) return;
+  const max = Math.max(...data, 1);
+  container.innerHTML = data.map(v => {
+    const h = Math.max(2, (v / max) * 18);
+    return `<span class="spark-bar" style="height:${h}px"></span>`;
+  }).join("");
+}
+
+// Threat level system
+function updateThreatLevel() {
+  if (!elements.threatSegments) return;
+  const segs = elements.threatSegments.querySelectorAll(".threat-seg");
+  const alertCount = viewer.entities.values.filter(e =>
+    e.name && (e.name.includes("INCIDENT") || e.name.includes("ALERT") || e.name.includes("Zone"))
+  ).length;
+  const level = Math.min(10, Math.round(alertCount * 1.2));
+
+  segs.forEach((seg, i) => {
+    seg.classList.remove("active", "low", "med", "high", "crit");
+    if (i < level) {
+      seg.classList.add("active");
+      if (i < 3) seg.classList.add("low");
+      else if (i < 6) seg.classList.add("med");
+      else if (i < 8) seg.classList.add("high");
+      else seg.classList.add("crit");
+    }
+  });
+  if (elements.threatValue) {
+    elements.threatValue.textContent = String(level);
+    elements.threatValue.style.color =
+      level <= 3 ? "var(--threat-low)" :
+      level <= 6 ? "var(--threat-med)" :
+      level <= 8 ? "var(--threat-high)" : "var(--threat-crit)";
+  }
+}
+
+// Data throughput simulation
+let _throughputBytes = 0;
+function updateThroughput() {
+  if (!elements.throughputBars || !elements.throughputValue) return;
+  // Simulate data flow based on active feeds
+  const feedCount = [state.liveFeeds.adsb, state.liveFeeds.ais].filter(f => f.status === "live").length;
+  const base = feedCount * 1200 + Math.random() * 800;
+  _throughputBytes = Math.round(base + Math.random() * 400 - 200);
+  const bars = elements.throughputBars.querySelectorAll(".throughput-bar");
+  bars.forEach(bar => {
+    bar.style.height = `${Math.round(3 + Math.random() * 11)}px`;
+  });
+  const formatted = _throughputBytes > 1024
+    ? `${(_throughputBytes / 1024).toFixed(1)} KB/s`
+    : `${_throughputBytes} B/s`;
+  elements.throughputValue.textContent = formatted;
+}
+
+// Signal status indicators
+function updateSignalIndicators() {
+  if (!elements.sigAdsb) return;
+  const setSignal = (el, status) => {
+    el.classList.remove("green", "amber", "red");
+    el.classList.add(status === "live" ? "green" : status === "error" ? "red" : "amber");
+  };
+  setSignal(elements.sigAdsb, state.liveFeeds.adsb.status);
+  setSignal(elements.sigNews, state.newsLastFetched || state.newsArticles.length ? "live" : "pending");
+  setSignal(elements.sigAis, state.liveFeeds.ais.status);
+}
+
+// Master ambient update loop for all dynamic indicators
+let _ambientUpdateTimer = null;
+function startAmbientUpdates() {
+  if (_ambientUpdateTimer) clearInterval(_ambientUpdateTimer);
+  // Fast updates (every 2s) for throughput/signal
+  _ambientUpdateTimer = setInterval(() => {
+    updateThroughput();
+    updateSignalIndicators();
+  }, 2000);
+  // Slower threat update every 8s
+  setInterval(updateThreatLevel, 8000);
+  // Initial run
+  updateThroughput();
+  updateSignalIndicators();
+  updateThreatLevel();
+}
+
