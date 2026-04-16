@@ -317,19 +317,454 @@ const COUNTRY_COORDS = {
 };
 
 /**
- * Resolve a GDELT article to geographic coordinates.
- * Returns { lat, lng } or null if the country can't be geocoded.
+ * City-level lookup dictionary — ~200 cities commonly appearing in geopolitical/conflict news.
+ * Keys are lowercase. Coordinates are city centres (not country centroids).
+ * This is the primary resolution layer; COUNTRY_COORDS is the fallback.
  */
+const CITY_COORDS = {
+  // Middle East & North Africa
+  "gaza":           { lat: 31.52,  lng: 34.47,  name: "Gaza" },
+  "gaza city":      { lat: 31.52,  lng: 34.47,  name: "Gaza City" },
+  "tel aviv":       { lat: 32.09,  lng: 34.78,  name: "Tel Aviv" },
+  "jerusalem":      { lat: 31.78,  lng: 35.22,  name: "Jerusalem" },
+  "west bank":      { lat: 31.95,  lng: 35.30,  name: "West Bank" },
+  "rafah":          { lat: 31.29,  lng: 34.25,  name: "Rafah" },
+  "ramallah":       { lat: 31.90,  lng: 35.21,  name: "Ramallah" },
+  "haifa":          { lat: 32.82,  lng: 34.99,  name: "Haifa" },
+  "beirut":         { lat: 33.89,  lng: 35.50,  name: "Beirut" },
+  "damascus":       { lat: 33.51,  lng: 36.29,  name: "Damascus" },
+  "aleppo":         { lat: 36.20,  lng: 37.16,  name: "Aleppo" },
+  "raqqa":          { lat: 35.95,  lng: 39.01,  name: "Raqqa" },
+  "idlib":          { lat: 35.93,  lng: 36.63,  name: "Idlib" },
+  "baghdad":        { lat: 33.34,  lng: 44.40,  name: "Baghdad" },
+  "mosul":          { lat: 36.34,  lng: 43.13,  name: "Mosul" },
+  "basra":          { lat: 30.51,  lng: 47.81,  name: "Basra" },
+  "erbil":          { lat: 36.19,  lng: 44.01,  name: "Erbil" },
+  "fallujah":       { lat: 33.35,  lng: 43.79,  name: "Fallujah" },
+  "tehran":         { lat: 35.69,  lng: 51.39,  name: "Tehran" },
+  "isfahan":        { lat: 32.66,  lng: 51.68,  name: "Isfahan" },
+  "natanz":         { lat: 33.72,  lng: 51.93,  name: "Natanz" },
+  "sanaa":          { lat: 15.37,  lng: 44.19,  name: "Sanaa" },
+  "aden":           { lat: 12.78,  lng: 45.04,  name: "Aden" },
+  "hodeidah":       { lat: 14.80,  lng: 42.95,  name: "Hodeidah" },
+  "riyadh":         { lat: 24.69,  lng: 46.72,  name: "Riyadh" },
+  "jeddah":         { lat: 21.49,  lng: 39.19,  name: "Jeddah" },
+  "mecca":          { lat: 21.39,  lng: 39.86,  name: "Mecca" },
+  "amman":          { lat: 31.95,  lng: 35.93,  name: "Amman" },
+  "cairo":          { lat: 30.04,  lng: 31.24,  name: "Cairo" },
+  "alexandria":     { lat: 31.21,  lng: 29.92,  name: "Alexandria" },
+  "tripoli":        { lat: 32.90,  lng: 13.18,  name: "Tripoli" },
+  "benghazi":       { lat: 32.12,  lng: 20.07,  name: "Benghazi" },
+  "tunis":          { lat: 36.82,  lng: 10.17,  name: "Tunis" },
+  "algiers":        { lat: 36.74,  lng: 3.06,   name: "Algiers" },
+  "casablanca":     { lat: 33.59,  lng: -7.62,  name: "Casablanca" },
+  "rabat":          { lat: 34.02,  lng: -6.83,  name: "Rabat" },
+  "ankara":         { lat: 39.93,  lng: 32.86,  name: "Ankara" },
+  "istanbul":       { lat: 41.01,  lng: 28.98,  name: "Istanbul" },
+  "doha":           { lat: 25.29,  lng: 51.53,  name: "Doha" },
+  "abu dhabi":      { lat: 24.45,  lng: 54.38,  name: "Abu Dhabi" },
+  "dubai":          { lat: 25.20,  lng: 55.27,  name: "Dubai" },
+  "muscat":         { lat: 23.62,  lng: 58.59,  name: "Muscat" },
+  "kuwait city":    { lat: 29.37,  lng: 47.98,  name: "Kuwait City" },
+  "manama":         { lat: 26.22,  lng: 50.59,  name: "Manama" },
+  // Ukraine / Russia / Eastern Europe
+  "kyiv":           { lat: 50.45,  lng: 30.52,  name: "Kyiv" },
+  "kiev":           { lat: 50.45,  lng: 30.52,  name: "Kyiv" },
+  "kharkiv":        { lat: 49.99,  lng: 36.23,  name: "Kharkiv" },
+  "odessa":         { lat: 46.48,  lng: 30.72,  name: "Odessa" },
+  "odesa":          { lat: 46.48,  lng: 30.72,  name: "Odesa" },
+  "zaporizhzhia":   { lat: 47.84,  lng: 35.14,  name: "Zaporizhzhia" },
+  "donetsk":        { lat: 48.00,  lng: 37.80,  name: "Donetsk" },
+  "mariupol":       { lat: 47.10,  lng: 37.54,  name: "Mariupol" },
+  "bakhmut":        { lat: 48.59,  lng: 38.00,  name: "Bakhmut" },
+  "kherson":        { lat: 46.63,  lng: 32.62,  name: "Kherson" },
+  "lviv":           { lat: 49.84,  lng: 24.03,  name: "Lviv" },
+  "dnipro":         { lat: 48.46,  lng: 35.05,  name: "Dnipro" },
+  "crimea":         { lat: 45.19,  lng: 34.00,  name: "Crimea" },
+  "sevastopol":     { lat: 44.59,  lng: 33.52,  name: "Sevastopol" },
+  "moscow":         { lat: 55.75,  lng: 37.62,  name: "Moscow" },
+  "st. petersburg": { lat: 59.94,  lng: 30.32,  name: "St. Petersburg" },
+  "st petersburg":  { lat: 59.94,  lng: 30.32,  name: "St. Petersburg" },
+  "belgorod":       { lat: 50.60,  lng: 36.59,  name: "Belgorod" },
+  "kaliningrad":    { lat: 54.71,  lng: 20.51,  name: "Kaliningrad" },
+  "minsk":          { lat: 53.90,  lng: 27.57,  name: "Minsk" },
+  "warsaw":         { lat: 52.23,  lng: 21.01,  name: "Warsaw" },
+  "bucharest":      { lat: 44.43,  lng: 26.10,  name: "Bucharest" },
+  "budapest":       { lat: 47.50,  lng: 19.04,  name: "Budapest" },
+  "prague":         { lat: 50.08,  lng: 14.44,  name: "Prague" },
+  "bratislava":     { lat: 48.15,  lng: 17.11,  name: "Bratislava" },
+  "vilnius":        { lat: 54.69,  lng: 25.28,  name: "Vilnius" },
+  "riga":           { lat: 56.95,  lng: 24.11,  name: "Riga" },
+  "tallinn":        { lat: 59.44,  lng: 24.75,  name: "Tallinn" },
+  "helsinki":       { lat: 60.17,  lng: 24.94,  name: "Helsinki" },
+  "tbilisi":        { lat: 41.69,  lng: 44.83,  name: "Tbilisi" },
+  "yerevan":        { lat: 40.18,  lng: 44.51,  name: "Yerevan" },
+  "baku":           { lat: 40.41,  lng: 49.87,  name: "Baku" },
+  "nagorno-karabakh": { lat: 39.82, lng: 46.76, name: "Nagorno-Karabakh" },
+  // Asia-Pacific
+  "beijing":        { lat: 39.91,  lng: 116.39, name: "Beijing" },
+  "shanghai":       { lat: 31.23,  lng: 121.47, name: "Shanghai" },
+  "hong kong":      { lat: 22.32,  lng: 114.17, name: "Hong Kong" },
+  "taipei":         { lat: 25.05,  lng: 121.56, name: "Taipei" },
+  "seoul":          { lat: 37.57,  lng: 126.98, name: "Seoul" },
+  "pyongyang":      { lat: 39.02,  lng: 125.75, name: "Pyongyang" },
+  "tokyo":          { lat: 35.69,  lng: 139.69, name: "Tokyo" },
+  "osaka":          { lat: 34.69,  lng: 135.50, name: "Osaka" },
+  "new delhi":      { lat: 28.61,  lng: 77.21,  name: "New Delhi" },
+  "mumbai":         { lat: 19.08,  lng: 72.88,  name: "Mumbai" },
+  "kolkata":        { lat: 22.57,  lng: 88.36,  name: "Kolkata" },
+  "chennai":        { lat: 13.08,  lng: 80.27,  name: "Chennai" },
+  "islamabad":      { lat: 33.72,  lng: 73.06,  name: "Islamabad" },
+  "karachi":        { lat: 24.86,  lng: 67.01,  name: "Karachi" },
+  "lahore":         { lat: 31.55,  lng: 74.34,  name: "Lahore" },
+  "peshawar":       { lat: 34.01,  lng: 71.58,  name: "Peshawar" },
+  "quetta":         { lat: 30.19,  lng: 67.01,  name: "Quetta" },
+  "kabul":          { lat: 34.53,  lng: 69.17,  name: "Kabul" },
+  "kandahar":       { lat: 31.62,  lng: 65.71,  name: "Kandahar" },
+  "dhaka":          { lat: 23.81,  lng: 90.41,  name: "Dhaka" },
+  "colombo":        { lat: 6.93,   lng: 79.86,  name: "Colombo" },
+  "kathmandu":      { lat: 27.72,  lng: 85.32,  name: "Kathmandu" },
+  "rangoon":        { lat: 16.87,  lng: 96.19,  name: "Yangon" },
+  "yangon":         { lat: 16.87,  lng: 96.19,  name: "Yangon" },
+  "naypyidaw":      { lat: 19.74,  lng: 96.12,  name: "Naypyidaw" },
+  "bangkok":        { lat: 13.75,  lng: 100.52, name: "Bangkok" },
+  "hanoi":          { lat: 21.03,  lng: 105.85, name: "Hanoi" },
+  "ho chi minh":    { lat: 10.82,  lng: 106.63, name: "Ho Chi Minh City" },
+  "jakarta":        { lat: -6.21,  lng: 106.85, name: "Jakarta" },
+  "manila":         { lat: 14.60,  lng: 120.98, name: "Manila" },
+  "kuala lumpur":   { lat: 3.14,   lng: 101.69, name: "Kuala Lumpur" },
+  "singapore":      { lat: 1.35,   lng: 103.82, name: "Singapore" },
+  "sydney":         { lat: -33.87, lng: 151.21, name: "Sydney" },
+  "canberra":       { lat: -35.28, lng: 149.13, name: "Canberra" },
+  // Africa
+  "nairobi":        { lat: -1.29,  lng: 36.82,  name: "Nairobi" },
+  "mogadishu":      { lat: 2.05,   lng: 45.34,  name: "Mogadishu" },
+  "addis ababa":    { lat: 9.03,   lng: 38.74,  name: "Addis Ababa" },
+  "khartoum":       { lat: 15.55,  lng: 32.53,  name: "Khartoum" },
+  "omdurman":       { lat: 15.65,  lng: 32.48,  name: "Omdurman" },
+  "juba":           { lat: 4.85,   lng: 31.60,  name: "Juba" },
+  "asmara":         { lat: 15.34,  lng: 38.93,  name: "Asmara" },
+  "djibouti":       { lat: 11.59,  lng: 43.15,  name: "Djibouti" },
+  "kinshasa":       { lat: -4.32,  lng: 15.32,  name: "Kinshasa" },
+  "lagos":          { lat: 6.52,   lng: 3.38,   name: "Lagos" },
+  "abuja":          { lat: 9.07,   lng: 7.40,   name: "Abuja" },
+  "accra":          { lat: 5.56,   lng: -0.21,  name: "Accra" },
+  "dakar":          { lat: 14.72,  lng: -17.47, name: "Dakar" },
+  "bamako":         { lat: 12.65,  lng: -8.00,  name: "Bamako" },
+  "ouagadougou":    { lat: 12.37,  lng: -1.53,  name: "Ouagadougou" },
+  "niamey":         { lat: 13.51,  lng: 2.12,   name: "Niamey" },
+  "ndjamena":       { lat: 12.11,  lng: 15.04,  name: "N'Djamena" },
+  "bangui":         { lat: 4.36,   lng: 18.56,  name: "Bangui" },
+  "cape town":      { lat: -33.93, lng: 18.42,  name: "Cape Town" },
+  "johannesburg":   { lat: -26.20, lng: 28.04,  name: "Johannesburg" },
+  "harare":         { lat: -17.83, lng: 31.05,  name: "Harare" },
+  "maputo":         { lat: -25.97, lng: 32.59,  name: "Maputo" },
+  "luanda":         { lat: -8.84,  lng: 13.23,  name: "Luanda" },
+  "dar es salaam":  { lat: -6.79,  lng: 39.21,  name: "Dar es Salaam" },
+  "kampala":        { lat: 0.32,   lng: 32.58,  name: "Kampala" },
+  "kigali":         { lat: -1.95,  lng: 30.06,  name: "Kigali" },
+  // Europe
+  "london":         { lat: 51.51,  lng: -0.13,  name: "London" },
+  "paris":          { lat: 48.85,  lng: 2.35,   name: "Paris" },
+  "berlin":         { lat: 52.52,  lng: 13.40,  name: "Berlin" },
+  "brussels":       { lat: 50.85,  lng: 4.35,   name: "Brussels" },
+  "madrid":         { lat: 40.42,  lng: -3.70,  name: "Madrid" },
+  "barcelona":      { lat: 41.39,  lng: 2.16,   name: "Barcelona" },
+  "seville":        { lat: 37.39,  lng: -5.98,  name: "Seville" },
+  "valencia":       { lat: 39.47,  lng: -0.38,  name: "Valencia" },
+  "bilbao":         { lat: 43.26,  lng: -2.93,  name: "Bilbao" },
+  "rome":           { lat: 41.90,  lng: 12.50,  name: "Rome" },
+  "milan":          { lat: 45.46,  lng: 9.19,   name: "Milan" },
+  "naples":         { lat: 40.85,  lng: 14.27,  name: "Naples" },
+  "florence":       { lat: 43.77,  lng: 11.25,  name: "Florence" },
+  "turin":          { lat: 45.07,  lng: 7.69,   name: "Turin" },
+  "amsterdam":      { lat: 52.37,  lng: 4.90,   name: "Amsterdam" },
+  "rotterdam":      { lat: 51.92,  lng: 4.48,   name: "Rotterdam" },
+  "stockholm":      { lat: 59.33,  lng: 18.07,  name: "Stockholm" },
+  "gothenburg":     { lat: 57.71,  lng: 11.97,  name: "Gothenburg" },
+  "oslo":           { lat: 59.91,  lng: 10.75,  name: "Oslo" },
+  "copenhagen":     { lat: 55.68,  lng: 12.57,  name: "Copenhagen" },
+  "vienna":         { lat: 48.21,  lng: 16.37,  name: "Vienna" },
+  "bern":           { lat: 46.95,  lng: 7.45,   name: "Bern" },
+  "zurich":         { lat: 47.38,  lng: 8.54,   name: "Zurich" },
+  "geneva":         { lat: 46.20,  lng: 6.14,   name: "Geneva" },
+  "munich":         { lat: 48.14,  lng: 11.58,  name: "Munich" },
+  "frankfurt":      { lat: 50.11,  lng: 8.68,   name: "Frankfurt" },
+  "hamburg":        { lat: 53.55,  lng: 9.99,   name: "Hamburg" },
+  "cologne":        { lat: 50.94,  lng: 6.96,   name: "Cologne" },
+  "düsseldorf":     { lat: 51.23,  lng: 6.78,   name: "Düsseldorf" },
+  "dusseldorf":     { lat: 51.23,  lng: 6.78,   name: "Düsseldorf" },
+  "lyon":           { lat: 45.76,  lng: 4.84,   name: "Lyon" },
+  "marseille":      { lat: 43.30,  lng: 5.37,   name: "Marseille" },
+  "toulouse":       { lat: 43.60,  lng: 1.44,   name: "Toulouse" },
+  "nice":           { lat: 43.71,  lng: 7.26,   name: "Nice" },
+  "strasbourg":     { lat: 48.57,  lng: 7.75,   name: "Strasbourg" },
+  // Greece
+  "athens":         { lat: 37.98,  lng: 23.73,  name: "Athens" },
+  "thessaloniki":   { lat: 40.64,  lng: 22.94,  name: "Thessaloniki" },
+  "patras":         { lat: 38.25,  lng: 21.73,  name: "Patras" },
+  "heraklion":      { lat: 35.34,  lng: 25.13,  name: "Heraklion" },
+  "larissa":        { lat: 39.64,  lng: 22.42,  name: "Larissa" },
+  "volos":          { lat: 39.36,  lng: 22.94,  name: "Volos" },
+  "ioannina":       { lat: 39.66,  lng: 20.85,  name: "Ioannina" },
+  "piraeus":        { lat: 37.94,  lng: 23.65,  name: "Piraeus" },
+  "rhodes":         { lat: 36.43,  lng: 28.22,  name: "Rhodes" },
+  "corfu":          { lat: 39.62,  lng: 19.92,  name: "Corfu" },
+  "crete":          { lat: 35.24,  lng: 24.47,  name: "Crete" },
+  "lesbos":         { lat: 39.10,  lng: 26.55,  name: "Lesbos" },
+  "samos":          { lat: 37.75,  lng: 26.97,  name: "Samos" },
+  "chios":          { lat: 38.37,  lng: 26.14,  name: "Chios" },
+  "alexandroupoli": { lat: 40.85,  lng: 25.87,  name: "Alexandroupoli" },
+  "kavala":         { lat: 40.94,  lng: 24.40,  name: "Kavala" },
+  "chania":         { lat: 35.51,  lng: 24.02,  name: "Chania" },
+  // Balkans extended
+  "belgrade":       { lat: 44.80,  lng: 20.46,  name: "Belgrade" },
+  "zagreb":         { lat: 45.81,  lng: 15.98,  name: "Zagreb" },
+  "sarajevo":       { lat: 43.85,  lng: 18.40,  name: "Sarajevo" },
+  "pristina":       { lat: 42.67,  lng: 21.17,  name: "Pristina" },
+  "skopje":         { lat: 41.99,  lng: 21.43,  name: "Skopje" },
+  "tirana":         { lat: 41.33,  lng: 19.82,  name: "Tirana" },
+  "podgorica":      { lat: 42.44,  lng: 19.26,  name: "Podgorica" },
+  "sofia":          { lat: 42.70,  lng: 23.32,  name: "Sofia" },
+  "plovdiv":        { lat: 42.15,  lng: 24.75,  name: "Plovdiv" },
+  "chisinau":       { lat: 47.01,  lng: 28.86,  name: "Chișinău" },
+  // Portugal
+  "lisbon":         { lat: 38.72,  lng: -9.14,  name: "Lisbon" },
+  "porto":          { lat: 41.16,  lng: -8.63,  name: "Porto" },
+  // UK / Ireland
+  "dublin":         { lat: 53.33,  lng: -6.25,  name: "Dublin" },
+  "edinburgh":      { lat: 55.95,  lng: -3.19,  name: "Edinburgh" },
+  "manchester":     { lat: 53.48,  lng: -2.24,  name: "Manchester" },
+  "birmingham":     { lat: 52.49,  lng: -1.89,  name: "Birmingham" },
+  "belfast":        { lat: 54.60,  lng: -5.93,  name: "Belfast" },
+  "glasgow":        { lat: 55.86,  lng: -4.25,  name: "Glasgow" },
+  // Nordics / Poland
+  "gdansk":         { lat: 54.35,  lng: 18.65,  name: "Gdańsk" },
+  "krakow":         { lat: 50.06,  lng: 19.94,  name: "Kraków" },
+  "wroclaw":        { lat: 51.11,  lng: 17.04,  name: "Wrocław" },
+  // Americas
+  "washington":     { lat: 38.90,  lng: -77.03, name: "Washington D.C." },
+  "washington d.c.": { lat: 38.90, lng: -77.03, name: "Washington D.C." },
+  "new york":       { lat: 40.71,  lng: -74.01, name: "New York" },
+  "los angeles":    { lat: 34.05,  lng: -118.24,name: "Los Angeles" },
+  "chicago":        { lat: 41.88,  lng: -87.63, name: "Chicago" },
+  "houston":        { lat: 29.76,  lng: -95.37, name: "Houston" },
+  "san francisco":  { lat: 37.77,  lng: -122.42,name: "San Francisco" },
+  "miami":          { lat: 25.76,  lng: -80.19, name: "Miami" },
+  "atlanta":        { lat: 33.75,  lng: -84.39, name: "Atlanta" },
+  "boston":          { lat: 42.36,  lng: -71.06, name: "Boston" },
+  "seattle":        { lat: 47.61,  lng: -122.33,name: "Seattle" },
+  "denver":         { lat: 39.74,  lng: -104.99,name: "Denver" },
+  "dallas":         { lat: 32.78,  lng: -96.80, name: "Dallas" },
+  "phoenix":        { lat: 33.45,  lng: -112.07,name: "Phoenix" },
+  "detroit":        { lat: 42.33,  lng: -83.05, name: "Detroit" },
+  "ottawa":         { lat: 45.42,  lng: -75.70, name: "Ottawa" },
+  "toronto":        { lat: 43.70,  lng: -79.42, name: "Toronto" },
+  "vancouver":      { lat: 49.28,  lng: -123.12,name: "Vancouver" },
+  "montreal":       { lat: 45.50,  lng: -73.57, name: "Montreal" },
+  "mexico city":    { lat: 19.43,  lng: -99.13, name: "Mexico City" },
+  "guadalajara":    { lat: 20.67,  lng: -103.35,name: "Guadalajara" },
+  "monterrey":      { lat: 25.69,  lng: -100.32,name: "Monterrey" },
+  "tijuana":        { lat: 32.53,  lng: -117.02,name: "Tijuana" },
+  "havana":         { lat: 23.14,  lng: -82.38, name: "Havana" },
+  "bogota":         { lat: 4.71,   lng: -74.07, name: "Bogotá" },
+  "medellin":       { lat: 6.25,   lng: -75.56, name: "Medellín" },
+  "caracas":        { lat: 10.48,  lng: -66.88, name: "Caracas" },
+  "lima":           { lat: -12.05, lng: -77.04, name: "Lima" },
+  "quito":          { lat: -0.18,  lng: -78.47, name: "Quito" },
+  "guayaquil":      { lat: -2.19,  lng: -79.89, name: "Guayaquil" },
+  "buenos aires":   { lat: -34.61, lng: -58.38, name: "Buenos Aires" },
+  "santiago":       { lat: -33.46, lng: -70.65, name: "Santiago" },
+  "brasilia":       { lat: -15.78, lng: -47.93, name: "Brasília" },
+  "sao paulo":      { lat: -23.55, lng: -46.63, name: "São Paulo" },
+  "rio de janeiro": { lat: -22.91, lng: -43.17, name: "Rio de Janeiro" },
+  "rio":            { lat: -22.91, lng: -43.17, name: "Rio de Janeiro" },
+  "port-au-prince": { lat: 18.54,  lng: -72.34, name: "Port-au-Prince" },
+  "panama city":    { lat: 8.98,   lng: -79.52, name: "Panama City" },
+  "san juan":       { lat: 18.47,  lng: -66.11, name: "San Juan" },
+  "santo domingo":  { lat: 18.47,  lng: -69.90, name: "Santo Domingo" },
+  "managua":        { lat: 12.13,  lng: -86.25, name: "Managua" },
+  "tegucigalpa":    { lat: 14.07,  lng: -87.19, name: "Tegucigalpa" },
+  "san salvador":   { lat: 13.69,  lng: -89.22, name: "San Salvador" },
+  "guatemala city": { lat: 14.63,  lng: -90.51, name: "Guatemala City" },
+  "montevideo":     { lat: -34.88, lng: -56.16, name: "Montevideo" },
+  "asuncion":       { lat: -25.26, lng: -57.58, name: "Asunción" },
+  "la paz":         { lat: -16.49, lng: -68.12, name: "La Paz" },
+  // Straits / regions
+  "strait of hormuz": { lat: 26.60, lng: 56.40, name: "Strait of Hormuz" },
+  "red sea":        { lat: 20.0,   lng: 38.0,   name: "Red Sea" },
+  "black sea":      { lat: 43.0,   lng: 35.0,   name: "Black Sea" },
+  "south china sea":{ lat: 15.0,   lng: 115.0,  name: "South China Sea" },
+  "taiwan strait":  { lat: 24.5,   lng: 119.5,  name: "Taiwan Strait" },
+  "baltic sea":     { lat: 58.0,   lng: 20.0,   name: "Baltic Sea" },
+  "persian gulf":   { lat: 26.5,   lng: 51.5,   name: "Persian Gulf" },
+  "gulf of aden":   { lat: 12.0,   lng: 47.0,   name: "Gulf of Aden" },
+  "suez canal":     { lat: 30.58,  lng: 32.35,  name: "Suez Canal" },
+  "bosporus":       { lat: 41.12,  lng: 29.08,  name: "Bosporus" },
+  "hormuz":         { lat: 26.60,  lng: 56.40,  name: "Strait of Hormuz" },
+  "mediterranean":  { lat: 35.0,   lng: 18.0,   name: "Mediterranean Sea" },
+  "aegean":         { lat: 38.5,   lng: 25.0,   name: "Aegean Sea" },
+  "adriatic":       { lat: 42.5,   lng: 16.0,   name: "Adriatic Sea" },
+  "arctic":         { lat: 75.0,   lng: 0.0,    name: "Arctic" },
+  // Native-script city names (for non-English headlines)
+  // Greek
+  "αθήνα":          { lat: 37.98,  lng: 23.73,  name: "Athens" },
+  "θεσσαλονίκη":   { lat: 40.64,  lng: 22.94,  name: "Thessaloniki" },
+  "πάτρα":          { lat: 38.25,  lng: 21.73,  name: "Patras" },
+  "ηράκλειο":       { lat: 35.34,  lng: 25.13,  name: "Heraklion" },
+  "πειραιάς":       { lat: 37.94,  lng: 23.65,  name: "Piraeus" },
+  "λάρισα":         { lat: 39.64,  lng: 22.42,  name: "Larissa" },
+  "κρήτη":          { lat: 35.24,  lng: 24.47,  name: "Crete" },
+  "ρόδος":          { lat: 36.43,  lng: 28.22,  name: "Rhodes" },
+  "κέρκυρα":        { lat: 39.62,  lng: 19.92,  name: "Corfu" },
+  "χανιά":          { lat: 35.51,  lng: 24.02,  name: "Chania" },
+  "βόλος":          { lat: 39.36,  lng: 22.94,  name: "Volos" },
+  "ιωάννινα":       { lat: 39.66,  lng: 20.85,  name: "Ioannina" },
+  "αλεξανδρούπολη": { lat: 40.85,  lng: 25.87,  name: "Alexandroupoli" },
+  "χεζμπολάχ":      { lat: 33.89,  lng: 35.50,  name: "Beirut" },
+  // Arabic
+  "بغداد":          { lat: 33.34,  lng: 44.40,  name: "Baghdad" },
+  "دمشق":           { lat: 33.51,  lng: 36.29,  name: "Damascus" },
+  "بيروت":          { lat: 33.89,  lng: 35.50,  name: "Beirut" },
+  "القاهرة":        { lat: 30.04,  lng: 31.24,  name: "Cairo" },
+  "الرياض":         { lat: 24.69,  lng: 46.72,  name: "Riyadh" },
+  "طهران":          { lat: 35.69,  lng: 51.39,  name: "Tehran" },
+  "غزة":            { lat: 31.52,  lng: 34.47,  name: "Gaza" },
+  "القدس":          { lat: 31.78,  lng: 35.22,  name: "Jerusalem" },
+  "صنعاء":          { lat: 15.37,  lng: 44.19,  name: "Sanaa" },
+  "الخرطوم":        { lat: 15.55,  lng: 32.53,  name: "Khartoum" },
+  "طرابلس":         { lat: 32.90,  lng: 13.18,  name: "Tripoli" },
+  "حلب":            { lat: 36.20,  lng: 37.16,  name: "Aleppo" },
+  "إدلب":           { lat: 35.93,  lng: 36.63,  name: "Idlib" },
+  "الموصل":         { lat: 36.34,  lng: 43.13,  name: "Mosul" },
+  // Russian / Cyrillic
+  "москва":         { lat: 55.75,  lng: 37.62,  name: "Moscow" },
+  "киев":           { lat: 50.45,  lng: 30.52,  name: "Kyiv" },
+  "київ":           { lat: 50.45,  lng: 30.52,  name: "Kyiv" },
+  "харків":         { lat: 49.99,  lng: 36.23,  name: "Kharkiv" },
+  "харьков":        { lat: 49.99,  lng: 36.23,  name: "Kharkiv" },
+  "одеса":          { lat: 46.48,  lng: 30.72,  name: "Odesa" },
+  "донецьк":        { lat: 48.00,  lng: 37.80,  name: "Donetsk" },
+  "донецк":         { lat: 48.00,  lng: 37.80,  name: "Donetsk" },
+  "минск":          { lat: 53.90,  lng: 27.57,  name: "Minsk" },
+  "белгород":       { lat: 50.60,  lng: 36.59,  name: "Belgorod" },
+  "санкт-петербург": { lat: 59.94, lng: 30.32,  name: "St. Petersburg" },
+  // Chinese
+  "北京":            { lat: 39.91,  lng: 116.39, name: "Beijing" },
+  "上海":            { lat: 31.23,  lng: 121.47, name: "Shanghai" },
+  "台北":            { lat: 25.05,  lng: 121.56, name: "Taipei" },
+  "香港":            { lat: 22.32,  lng: 114.17, name: "Hong Kong" },
+  // Japanese
+  "東京":            { lat: 35.69,  lng: 139.69, name: "Tokyo" },
+  "大阪":            { lat: 34.69,  lng: 135.50, name: "Osaka" },
+  // Korean
+  "서울":            { lat: 37.57,  lng: 126.98, name: "Seoul" },
+  "평양":            { lat: 39.02,  lng: 125.75, name: "Pyongyang" },
+  // Turkish
+  "İstanbul":       { lat: 41.01,  lng: 28.98,  name: "Istanbul" },
+  // Spanish-language city names
+  "ciudad de méxico": { lat: 19.43, lng: -99.13, name: "Mexico City" },
+  "nueva york":     { lat: 40.71,  lng: -74.01, name: "New York" },
+  // Portuguese
+  "são paulo":      { lat: -23.55, lng: -46.63, name: "São Paulo" },
+  "rio de janeiro": { lat: -22.91, lng: -43.17, name: "Rio de Janeiro" },
+  // Hindi / Devanagari
+  "दिल्ली":          { lat: 28.61,  lng: 77.21,  name: "New Delhi" },
+  "मुंबई":           { lat: 19.08,  lng: 72.88,  name: "Mumbai" },
+  // Hebrew
+  "תל אביב":        { lat: 32.09,  lng: 34.78,  name: "Tel Aviv" },
+  "ירושלים":        { lat: 31.78,  lng: 35.22,  name: "Jerusalem" },
+  // Hezbollah / organisation-as-location (maps to HQ area)
+  "hezbollah":      { lat: 33.86,  lng: 35.51,  name: "Beirut" },
+  "hamas":          { lat: 31.52,  lng: 34.47,  name: "Gaza" },
+  "houthi":         { lat: 15.37,  lng: 44.19,  name: "Sanaa" },
+  "houthis":        { lat: 15.37,  lng: 44.19,  name: "Sanaa" },
+  "kremlin":        { lat: 55.75,  lng: 37.62,  name: "Moscow" },
+  "pentagon":       { lat: 38.87,  lng: -77.06, name: "Washington D.C." },
+  "nato":           { lat: 50.88,  lng: 4.43,   name: "Brussels" },
+  "wagner":         { lat: 55.75,  lng: 37.62,  name: "Moscow" },
+};
+
+/**
+ * Extract the best location from a news article title and sourcecountry.
+ * Returns { lat, lng, name } or null.
+ * Priority: city/place match in title > Nominatim-cached lookup > country capital
+ */
+
+// Persistent Nominatim geocode cache — survives page reloads
+const _GEO_CACHE_KEY = "ge-geocache-v1";
+let _nominatimGeoCache = (() => {
+  try { return JSON.parse(localStorage.getItem(_GEO_CACHE_KEY) || "{}"); }
+  catch(e) { return {}; }
+})();
+function _saveGeoCache() {
+  try { localStorage.setItem(_GEO_CACHE_KEY, JSON.stringify(_nominatimGeoCache)); } catch(e) {}
+}
+
+// Rate-limited async enrichment — geocodes unknown place names via Nominatim,
+// stores results in _nominatimGeoCache for future synchronous use.
+const _enrichQueue = new Set();
+async function enrichGeoCache(placeName) {
+  if (!placeName || _enrichQueue.has(placeName) || _nominatimGeoCache[placeName]) return;
+  _enrichQueue.add(placeName);
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(placeName)}&format=json&limit=1&addressdetails=0`;
+    const resp = await nominatimFetch(url);
+    if (!resp.ok) return;
+    const results = await resp.json();
+    if (Array.isArray(results) && results.length > 0) {
+      const r = results[0];
+      _nominatimGeoCache[placeName] = { lat: parseFloat(r.lat), lng: parseFloat(r.lon), name: r.display_name.split(",")[0] };
+      _saveGeoCache();
+    }
+  } catch(e) { /* non-critical */ } finally {
+    _enrichQueue.delete(placeName);
+  }
+}
+
 function resolveArticleGeo(article) {
-  if (!article?.country) return null;
-  const key = article.country.toLowerCase().trim();
-  const coords = COUNTRY_COORDS[key];
-  if (!coords) return null;
-  // Apply jitter (±2°) so multiple articles from the same country don't stack
-  return {
-    lat: coords.lat + (Math.random() - 0.5) * 4,
-    lng: coords.lng + (Math.random() - 0.5) * 4
-  };
+  const title = (article?.title || "").toLowerCase();
+  const country = (article?.country || "").toLowerCase().trim();
+
+  // 1. Scan title for known city/place names (longest match wins)
+  let bestMatch = null;
+  let bestLen = 0;
+  for (const [key, coords] of Object.entries(CITY_COORDS)) {
+    if (key.length > bestLen && title.includes(key)) {
+      bestMatch = coords;
+      bestLen = key.length;
+    }
+  }
+  if (bestMatch) {
+    return {
+      lat: bestMatch.lat + (Math.random() - 0.5) * 0.3,
+      lng: bestMatch.lng + (Math.random() - 0.5) * 0.3,
+      name: bestMatch.name
+    };
+  }
+
+  // 2. Check Nominatim persistent cache (filled async from previous lookups)
+  if (country && _nominatimGeoCache[country]) {
+    const c = _nominatimGeoCache[country];
+    return { lat: c.lat + (Math.random() - 0.5) * 0.5, lng: c.lng + (Math.random() - 0.5) * 0.5, name: c.name };
+  }
+
+  // 3. Fall back to country capital coords (already city-level)
+  if (!country) return null;
+  const coords = COUNTRY_COORDS[country];
+  if (coords) {
+    // Fire async enrichment for countries not in our city dict — result cached for next time
+    if (!COUNTRY_COORDS[country] || !CITY_COORDS[country]) enrichGeoCache(article.country);
+    return {
+      lat: coords.lat + (Math.random() - 0.5) * 1.5,
+      lng: coords.lng + (Math.random() - 0.5) * 1.5,
+      name: article.country
+    };
+  }
+
+  // 4. Last resort: fire Nominatim and return null this time (will succeed next spawn)
+  enrichGeoCache(article.country || title.split(" ").slice(0, 3).join(" "));
+  return null;
 }
 
 const dynamic = {
@@ -1681,8 +2116,8 @@ const _RECENT_GEO_MAX = 16;
 
 /**
  * Pick a geolocatable news article from the live ticker pool.
- * Returns { article, geo: {lat, lng} } or null.
- * Prefers articles we haven't recently spawned to spread across the globe.
+ * Uses title-based city extraction + country fallback (no external GEO API).
+ * Returns { article, geo: {lat, lng, name} } or null.
  */
 function pickGeoArticle() {
   const pool = state.newsTickerPool;
@@ -1989,7 +2424,10 @@ function spawnEventVisualBurst() {
     const articleUrl = article.url || "";
     const articleLang = article.language || "";
     const articleDomain = article.domain || "";
-    const countryNote = article.country ? ` [${article.country}]` : "";
+    const geoName = geo.name || article.country || null;
+    const countryNote = geoName ? ` [${geoName}]` : article.country ? ` [${article.country}]` : "";
+    // Pin label: show place name when we have real coords, else truncated title
+    const pinLabel = geoName || (article.country ? article.country.toUpperCase() : eventLabel.slice(0, 28));
 
     const dot = viewer.entities.add({
       position: Cesium.Cartesian3.fromDegrees(lng, lat, 1200),
@@ -1999,6 +2437,23 @@ function spawnEventVisualBurst() {
         outlineColor: Cesium.Color.WHITE.withAlpha(0.85),
         outlineWidth: 1.5,
         disableDepthTestDistance: Number.POSITIVE_INFINITY
+      },
+      label: {
+        text: pinLabel,
+        font: '11px "Share Tech Mono", monospace',
+        fillColor: Cesium.Color.fromCssColorString(style.dot).withAlpha(0.95),
+        outlineColor: Cesium.Color.BLACK.withAlpha(0.7),
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromCssColorString("rgba(5,12,23,0.72)"),
+        backgroundPadding: new Cesium.Cartesian2(5, 3),
+        horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
+        verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+        pixelOffset: new Cesium.Cartesian2(8, -8),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        scaleByDistance: new Cesium.NearFarScalar(5e5, 1.0, 8e6, 0.4),
+        translucencyByDistance: new Cesium.NearFarScalar(1e6, 1.0, 1.2e7, 0.0)
       },
       properties: {
         layerId: "incidents",
@@ -2065,8 +2520,23 @@ function spawnEventVisualBurst() {
     pruneEventVisuals();
     updateEventCount();
     flashEventSpawn(lng, lat);
+    updateEventHistoryTrail(lng, lat);
     rebuildConnectionLines();
-    showEventToast(article.title, article.country);
+    // Show translated toast for non-English articles
+    if (articleLang && isNonEnglish(articleLang)) {
+      const cacheKey = `${articleLang}::${article.title}`;
+      const cached = _translationCache.get(cacheKey);
+      if (cached && cached !== article.title) {
+        showEventToast(cached, article.country);
+      } else {
+        showEventToast(article.title, article.country);
+        translateTitle(article.title, articleLang).then(translated => {
+          // Toast already shown with original — next time it'll be cached
+        });
+      }
+    } else {
+      showEventToast(article.title, article.country);
+    }
     updateSessionStats(article.country);
     // Haptic buzz on mobile when a geo event spawns
     if (navigator.vibrate) navigator.vibrate(40);
@@ -2177,6 +2647,7 @@ function spawnEventVisualBurst() {
   pruneEventVisuals();
   updateEventCount();
   flashEventSpawn(lng, lat);
+  updateEventHistoryTrail(lng, lat);
   rebuildConnectionLines();
 }
 
@@ -3402,7 +3873,7 @@ function initTerminalCli() {
 
     switch (cmd) {
       case "/help":
-        appendOutput("Commands: /focus <region> · /mode <fx> · /alert <level> · /scan · /warroom · /normal · /stats · /events · /country <name> · /refresh · /screenshot · /theme · /fullscreen · /uptime · /goto <lat,lng> · /layers · /fly <dest> · /perf · /reset · /search <term> · /time · /opacity <0-1> · /summary · /bookmark <name> · /measure · /clear · /help", "cmd-info");
+        appendOutput("Commands: /focus <region> · /mode <fx> · /alert <level> · /scan · /warroom · /normal · /stats · /events · /country <name> · /refresh · /screenshot · /theme · /fullscreen · /uptime · /goto <lat,lng> · /layers · /fly <dest> · /perf · /reset · /search <term> · /time · /opacity <0-1> · /summary · /bookmark <name> · /measure · /export · /clear · /help", "cmd-info");
         break;
 
       case "/focus": {
@@ -3701,12 +4172,41 @@ function initTerminalCli() {
         break;
       }
 
+      case "/export": {
+        // Export current live events as JSON to clipboard
+        try {
+          const exportData = {
+            exportedAt: new Date().toISOString(),
+            threatLevel: document.getElementById("threat-value")?.textContent || "N/A",
+            liveEvents: dynamic.eventVisuals.map((v, i) => ({
+              index: i,
+              lat: v.lat ?? null,
+              lng: v.lng ?? null,
+              bornAt: new Date(v.bornAt).toISOString(),
+              ttlMs: v.ttlMs,
+              geoSpawned: v.geoSpawned ?? false
+            })),
+            connectionCount: dynamic.connectionLines.length,
+            entityCount: viewer.entities.values.length
+          };
+          const json = JSON.stringify(exportData, null, 2);
+          navigator.clipboard.writeText(json).then(() => {
+            appendOutput(`✓ Exported ${exportData.liveEvents.length} events to clipboard as JSON.`, "cmd-ok");
+          }).catch(() => {
+            appendOutput(json.slice(0, 500) + "\n[...truncated — copy from above]", "cmd-info");
+          });
+        } catch (e) {
+          appendOutput(`Export failed: ${e.message}`, "cmd-err");
+        }
+        break;
+      }
+
       default:
         appendOutput(`Unknown command: ${cmd}. Type /help for available commands.`, "cmd-err");
     }
   }
 
-  const CLI_COMMANDS = ["/help", "/focus", "/mode", "/alert", "/scan", "/warroom", "/normal", "/stats", "/events", "/country", "/refresh", "/screenshot", "/theme", "/fullscreen", "/uptime", "/goto", "/layers", "/fly", "/perf", "/reset", "/search", "/time", "/opacity", "/summary", "/bookmark", "/measure", "/clear"];
+  const CLI_COMMANDS = ["/help", "/focus", "/mode", "/alert", "/scan", "/warroom", "/normal", "/stats", "/events", "/country", "/refresh", "/screenshot", "/theme", "/fullscreen", "/uptime", "/goto", "/layers", "/fly", "/perf", "/reset", "/search", "/time", "/opacity", "/summary", "/bookmark", "/measure", "/export", "/clear"];
 
   cliInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -5506,11 +6006,11 @@ function setNewsTickerPool(items) {
   preTranslatePool(state.newsTickerPool);
 }
 
-/** Fire-and-forget: translate up to 8 non-English titles ahead of time */
+/** Fire-and-forget: translate up to 16 non-English titles ahead of time */
 function preTranslatePool(pool) {
   let queued = 0;
   for (const item of pool) {
-    if (queued >= 8) break;
+    if (queued >= 16) break;
     if (!item.language || !isNonEnglish(item.language)) continue;
     const cacheKey = `${item.language}::${item.title}`;
     if (_translationCache.has(cacheKey)) continue;
@@ -5582,6 +6082,37 @@ function rotateToNextNewsCategory() {
    ══════════════════════════════════════════════════════════════════════════ */
 const _translationCache = new Map(); // key: `${langCode}::${text}` → translated string
 
+// GDELT returns full language names; MyMemory expects ISO 639-1 codes
+const _LANG_TO_ISO = {
+  "arabic": "ar", "chinese": "zh", "dutch": "nl", "french": "fr",
+  "german": "de", "greek": "el", "hebrew": "he", "hindi": "hi",
+  "hungarian": "hu", "indonesian": "id", "italian": "it", "japanese": "ja",
+  "korean": "ko", "malay": "ms", "marathi": "mr", "norwegian": "no",
+  "persian": "fa", "polish": "pl", "portuguese": "pt", "romanian": "ro",
+  "russian": "ru", "serbian": "sr", "spanish": "es", "swedish": "sv",
+  "tamil": "ta", "telugu": "te", "thai": "th", "turkish": "tr",
+  "ukrainian": "uk", "urdu": "ur", "vietnamese": "vi", "bengali": "bn",
+  "czech": "cs", "danish": "da", "finnish": "fi", "bulgarian": "bg",
+  "catalan": "ca", "croatian": "hr", "slovak": "sk", "slovenian": "sl",
+  "swahili": "sw", "tagalog": "tl", "afrikaans": "af", "albanian": "sq",
+  "amharic": "am", "azerbaijani": "az", "basque": "eu", "belarusian": "be",
+  "bosnian": "bs", "burmese": "my", "estonian": "et", "georgian": "ka",
+  "gujarati": "gu", "hausa": "ha", "icelandic": "is", "kannada": "kn",
+  "kazakh": "kk", "khmer": "km", "latvian": "lv", "lithuanian": "lt",
+  "macedonian": "mk", "malayalam": "ml", "mongolian": "mn", "nepali": "ne",
+  "pashto": "ps", "punjabi": "pa", "sinhala": "si", "somali": "so",
+  "uzbek": "uz", "yoruba": "yo", "zulu": "zu"
+};
+
+function langToIso(code) {
+  if (!code) return code;
+  // If already a 2-3 letter code, return as-is
+  if (code.length <= 3) return code.toLowerCase();
+  // Try lookup by full name
+  const iso = _LANG_TO_ISO[code.toLowerCase()];
+  return iso || code.toLowerCase();
+}
+
 let _langNames;
 try {
   _langNames = new Intl.DisplayNames(["en"], { type: "language" });
@@ -5606,7 +6137,7 @@ function isNonEnglish(langCode) {
 }
 
 /**
- * Translate a single title via MyMemory (free, no key).
+ * Translate a single title via Google Translate (free, no key).
  * Returns the translated string, or the original if translation fails/matches.
  * Results are cached in-memory.
  */
@@ -5615,14 +6146,16 @@ async function translateTitle(text, fromLang) {
   const cacheKey = `${fromLang}::${text}`;
   if (_translationCache.has(cacheKey)) return _translationCache.get(cacheKey);
 
+  const isoCode = langToIso(fromLang);
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(fromLang)}|en`;
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(isoCode)}&tl=en&dt=t&q=${encodeURIComponent(text)}`;
     const signal = AbortSignal.timeout ? AbortSignal.timeout(7000) : undefined;
     const res = await fetch(url, { signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    const translated = data?.responseData?.translatedText;
-    if (translated && translated !== text && !translated.includes("MYMEMORY WARNING")) {
+    // Response is nested array: [[["translated","original",...],...],...]
+    const translated = data?.[0]?.map(s => s[0]).join("");
+    if (translated && translated !== text) {
       _translationCache.set(cacheKey, translated);
       return translated;
     }
@@ -6346,6 +6879,24 @@ function animateThroughputBars() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GENERIC TOAST — brief UI feedback messages
+// ─────────────────────────────────────────────────────────────────────────────
+function showToast(message, type = "info") {
+  const toast = document.createElement("div");
+  toast.className = `event-toast toast-${type}`;
+  const icon = type === "warning" ? "⚠" : "ℹ";
+  toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-text">${escapeHtml(message)}</span>`;
+  toast.style.top = "60px";
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("toast-enter"));
+  setTimeout(() => {
+    toast.classList.remove("toast-enter");
+    toast.classList.add("toast-exit");
+    setTimeout(() => toast.remove(), 400);
+  }, 2500);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // EVENT TOAST NOTIFICATIONS — slide-in toasts when new events spawn
 // ─────────────────────────────────────────────────────────────────────────────
 const _toastQueue = [];
@@ -6398,6 +6949,37 @@ function processToastQueue() {
 // ─────────────────────────────────────────────────────────────────────────────
 // SESSION STATS — track and display operational session metrics
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Event history breadcrumb trail — connects the last N geo-spawned events
+const _eventHistoryPositions = [];
+const _EVENT_HISTORY_MAX = 20;
+let _eventHistoryEntity = null;
+
+function updateEventHistoryTrail(lng, lat) {
+  _eventHistoryPositions.push(Cesium.Cartesian3.fromDegrees(lng, lat, 3000));
+  if (_eventHistoryPositions.length > _EVENT_HISTORY_MAX) {
+    _eventHistoryPositions.shift();
+  }
+  if (_eventHistoryPositions.length < 2) return;
+
+  if (_eventHistoryEntity) {
+    try { viewer.entities.remove(_eventHistoryEntity); } catch (e) {}
+  }
+  _eventHistoryEntity = viewer.entities.add({
+    polyline: {
+      positions: [..._eventHistoryPositions],
+      width: 1.0,
+      material: new Cesium.PolylineDashMaterialProperty({
+        color: Cesium.Color.fromCssColorString("#00e5ff").withAlpha(0.25),
+        dashLength: 18,
+        dashPattern: 0xFF00
+      }),
+      arcType: Cesium.ArcType.GEODESIC,
+      clampToGround: false
+    }
+  });
+}
+
 function updateSessionStats(country) {
   state.sessionStats.eventsSpawned++;
   if (country) state.sessionStats.countriesSeen.add(country.toLowerCase());
@@ -6834,23 +7416,21 @@ function _haversineKm(lat1, lng1, lat2, lng2) {
 
 function checkEntityProximity() {
   const now = Cesium.JulianDate.now();
-  const live = dynamic.eventVisuals.filter(v => v._geLat != null && v._geLng != null);
+  const live = dynamic.eventVisuals.filter(v => v.lat != null && v.lng != null);
   for (let i = 0; i < live.length; i++) {
     for (let j = i + 1; j < live.length; j++) {
       const a = live[i], b = live[j];
-      const key = [a.id, b.id].sort().join("|");
+      const key = `${i}|${j}`;
       if (_proximityAlerted.has(key)) continue;
-      const dist = haversineDist(a._geGeoLat ?? a._geEventLat ?? 0, a._geGeoLng ?? a._geEventLng ?? 0,
-                                  b._geGeoLat ?? b._geEventLat ?? 0, b._geGeoLng ?? b._geEventLng ?? 0);
+      const dist = _haversineKm(a.lat, a.lng, b.lat, b.lng);
       if (dist < 500) {
         _proximityAlerted.add(key);
         setTimeout(() => _proximityAlerted.delete(key), 60000);
         showToast(`⚠ Proximity alert: ${dist.toFixed(0)} km between events`, "warning");
         // Spawn a brief yellow ring at midpoint
         try {
-          const lat1 = a._geEventLat ?? 0, lng1 = a._geEventLng ?? 0;
-          const lat2 = b._geEventLat ?? 0, lng2 = b._geEventLng ?? 0;
-          const midLat = (lat1 + lat2) / 2, midLng = (lng1 + lng2) / 2;
+          const midLat = (a.lat + b.lat) / 2, midLng = (a.lng + b.lng) / 2;
+          const now = Cesium.JulianDate.now();
           const pRing = viewer.entities.add({
             position: Cesium.Cartesian3.fromDegrees(midLng, midLat, 0),
             ellipse: {

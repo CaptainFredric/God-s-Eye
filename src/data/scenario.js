@@ -252,35 +252,35 @@ export const SCENARIO = {
     {
       id: "alert-comms",
       region: "SIGNAL",
-      title: "Comms Blackout — Theater Core",
-      summary: "Ground reporting remains suppressed across the theater core region.",
+      title: "Signal Integrity Monitoring",
+      summary: "Continuous monitoring of global communications infrastructure for degradation and anomalies.",
       sourceLabel: "Signal integrity monitor",
       sourceUrl: "https://www.first.org/",
       updates: [
         {
-          title: "Comms Blackout — Theater Core",
-          summary: "Ground reporting remains suppressed across the theater core region.",
+          title: "Signal Integrity Monitoring",
+          summary: "Continuous monitoring of global communications infrastructure for degradation and anomalies.",
           sourceLabel: "Signal integrity monitor",
           sourceUrl: "https://www.first.org/",
           publishedAt: "Updated moments ago"
         },
         {
-          title: "Partial Uplink Recovery Detected",
-          summary: "Intermittent uplink recovery appears at northern edge nodes but remains unstable.",
-          sourceLabel: "Net telemetry observer",
+          title: "Undersea Cable Traffic Nominal",
+          summary: "Major undersea cable routes report stable throughput with no latency anomalies.",
+          sourceLabel: "Cable health monitor",
           sourceUrl: "https://www.first.org/",
           publishedAt: "Update +12 min"
         },
         {
-          title: "Core Suppression Persists",
-          summary: "Central reporting channels remain suppressed despite edge-node normalization.",
-          sourceLabel: "Signal continuity bulletin",
+          title: "Regional Node Variance Detected",
+          summary: "Minor variance in regional relay nodes under observation; no degradation confirmed.",
+          sourceLabel: "Network continuity brief",
           sourceUrl: "https://www.first.org/",
           publishedAt: "Update +27 min"
         }
       ],
-      tags: ["signals", "blackout"],
-      location: { lng: 51.4, lat: 35.6 }
+      tags: ["signals", "infrastructure"],
+      location: { lng: 35.0, lat: 31.5 }
     }
   ],
   flights: {
@@ -546,60 +546,60 @@ export const SCENARIO = {
   ],
   incidents: [
     {
-      id: "incident-aoi",
-      label: "AOI Strike",
-      description: "Primary event window — elevated activity in this sector.",
-      sourceLabel: "Incident desk",
+      id: "incident-hotspot-me",
+      label: "Monitoring Zone",
+      description: "Elevated activity detected in the active monitoring zone.",
+      sourceLabel: "Global incident desk",
       sourceUrl: "https://reliefweb.int/",
       updates: [
         {
-          description: "Primary event window — elevated activity in this sector.",
-          sourceLabel: "Incident desk",
+          description: "Elevated activity detected in the active monitoring zone.",
+          sourceLabel: "Global incident desk",
           sourceUrl: "https://reliefweb.int/",
           publishedAt: "Updated moments ago"
         },
         {
-          description: "Follow-on activity indicates sustained pressure around the original strike corridor.",
-          sourceLabel: "Field incident brief",
+          description: "Sustained activity in monitored sectors; automated correlation engines active.",
+          sourceLabel: "Field analytics brief",
           sourceUrl: "https://reliefweb.int/",
           publishedAt: "Update +15 min"
         },
         {
-          description: "Peripheral sectors show elevated movement while strike core remains high priority.",
+          description: "Peripheral corridors show normalized traffic while core zone remains elevated.",
           sourceLabel: "Sector watch report",
           sourceUrl: "https://reliefweb.int/",
           publishedAt: "Update +31 min"
         }
       ],
-      location: { lng: 53.9, lat: 33.1 }
+      location: { lng: 44.4, lat: 33.3 }
     },
     {
-      id: "incident-blackout",
-      label: "Comms Blackout",
-      description: "Ground reporting suppressed in the theater core.",
-      sourceLabel: "Signal monitor",
+      id: "incident-infra",
+      label: "Infrastructure Watch",
+      description: "Continuous infrastructure health monitoring across critical relay points.",
+      sourceLabel: "Infrastructure monitor",
       sourceUrl: "https://www.first.org/",
       updates: [
         {
-          description: "Ground reporting suppressed in the theater core.",
-          sourceLabel: "Signal monitor",
+          description: "Continuous infrastructure health monitoring across critical relay points.",
+          sourceLabel: "Infrastructure monitor",
           sourceUrl: "https://www.first.org/",
           publishedAt: "Updated moments ago"
         },
         {
-          description: "Edge relays intermittently reconnect, but primary channels remain unstable.",
-          sourceLabel: "Relay status board",
+          description: "Relay throughput stable; scheduled maintenance windows proceeding normally.",
+          sourceLabel: "Network status board",
           sourceUrl: "https://www.first.org/",
           publishedAt: "Update +13 min"
         },
         {
-          description: "Data continuity remains degraded with burst traffic and repeated blackout windows.",
+          description: "Telemetry confirms nominal operations across all monitored infrastructure nodes.",
           sourceLabel: "Network continuity brief",
           sourceUrl: "https://www.first.org/",
           publishedAt: "Update +28 min"
         }
       ],
-      location: { lng: 51.4, lat: 35.6 }
+      location: { lng: 35.0, lat: 31.5 }
     },
     {
       id: "incident-pacific",
