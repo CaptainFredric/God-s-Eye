@@ -17,7 +17,7 @@ The project started as a 2D replay console and was rebuilt from scratch into a l
 ## Key Features
 
 | Category | Highlights |
-|---|---|
+| --- | --- |
 | **3D Globe** | Fully interactive CesiumJS Earth with drag, zoom, tilt, spin, and cinematic camera presets |
 | **Live Feeds** | Real-time ADS-B aircraft tracking (OpenSky Network), GDELT news intelligence, and simulated AIS maritime data |
 | **Six Data Layers** | Commercial flights, military traffic, orbital satellites, maritime routes, incident zones, and jamming/closure areas — each independently togglable |
@@ -34,7 +34,7 @@ The project started as a 2D replay console and was rebuilt from scratch into a l
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | **3D Engine** | [CesiumJS 1.124.0](https://cesium.com/) — WebGL globe rendering, entity management, camera control |
 | **Build Tool** | [Vite 6.x](https://vitejs.dev/) + [vite-plugin-cesium](https://github.com/nshen/vite-plugin-cesium) |
 | **Language** | Vanilla JavaScript (ES modules, zero frameworks) |
@@ -45,7 +45,7 @@ The project started as a 2D replay console and was rebuilt from scratch into a l
 
 ## Architecture
 
-```
+```text
 index.html                  ← Vite app shell, full HUD layout (~550 lines)
 src/
   main.js                   ← Cesium viewer, all UI logic, entity engine (~4,500 lines)

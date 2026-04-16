@@ -40,7 +40,8 @@ export const FX_MODES = [
   { id: "normal", label: "Normal" },
   { id: "nightvision", label: "NV" },
   { id: "thermal", label: "Thermal" },
-  { id: "crt", label: "CRT" }
+  { id: "crt", label: "CRT" },
+  { id: "warroom", label: "WAR ROOM" }
 ];
 
 export const LAYERS = [
