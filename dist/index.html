@@ -6,16 +6,35 @@
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>God's Eye — Live Global Surveillance</title>
+  <title>God's Eye — Live Global Surveillance Dashboard</title>
   <meta
     name="description"
-    content="God's Eye is a real-time global surveillance dashboard with live ADS-B aircraft, maritime tracks, orbital passes, and geopolitical overlays."
+    content="God's Eye (Panopticon Earth) is a real-time 3D global surveillance dashboard built on CesiumJS. Track live ADS-B aircraft, maritime vessels, orbital satellites, and geopolitical incidents on an interactive globe with HUD-style controls."
   />
+  <meta name="keywords" content="CesiumJS, geospatial intelligence, ADS-B, surveillance dashboard, 3D globe, OSINT, real-time tracking" />
+  <meta name="author" content="Aden Cisneros" />
+  <meta name="theme-color" content="#0a0e1a" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="God's Eye — Live Global Surveillance Dashboard" />
+  <meta property="og:description" content="A real-time 3D global intelligence command center. Track aircraft, satellites, maritime routes, and geopolitical incidents on an interactive CesiumJS globe." />
+  <meta property="og:url" content="https://captainfredric.github.io/God-s-Eye/" />
+  <meta property="og:site_name" content="Panopticon Earth" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="God's Eye — Live Global Surveillance" />
+  <meta name="twitter:description" content="Real-time 3D global intelligence dashboard with live ADS-B, AIS, satellite, and OSINT feeds on an interactive globe." />
+
+  <!-- Inline SVG Favicon -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='120' y2='120' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='50%25' stop-color='%23a78bfa'/%3E%3Cstop offset='100%25' stop-color='%23ff4d6d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='120' height='120' rx='24' fill='%230a0e1a'/%3E%3Cpolygon points='60,14 102,38 102,82 60,106 18,82 18,38' fill='none' stroke='url(%23g)' stroke-width='3'/%3E%3Ccircle cx='60' cy='60' r='18' fill='none' stroke='url(%23g)' stroke-width='2.5'/%3E%3Ccircle cx='60' cy='60' r='7' fill='url(%23g)' opacity='0.85'/%3E%3C/svg%3E" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-Bp9iKV-v.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DLFiARmy.css">
+  <script type="module" crossorigin src="./assets/index-Dc0dAhja.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-NRN_uoFY.css">
 </head>
 <body>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
@@ -41,9 +60,9 @@
           <div class="boot-hex-pulse"></div>
         </div>
         <div class="boot-text-block">
-          <div class="boot-kicker">PANOPTICON-EARTH // CLASSIFIED</div>
+          <div class="boot-kicker">PANOPTICON-EARTH // LIVE INTELLIGENCE</div>
           <div class="boot-title">GOD'S EYE</div>
-          <div class="boot-subtitle">Global Intelligence Command Center</div>
+          <div class="boot-subtitle">Real-Time Global Surveillance Command Center</div>
         </div>
       </div>
       <div class="boot-progress-wrap">
@@ -118,7 +137,7 @@
   </div>
 
   <div id="app">
-    <div id="classification-bar" class="classification-bar" aria-hidden="true">UNCLASSIFIED // FOR OFFICIAL USE ONLY // OPEN SOURCE INTELLIGENCE // PANOPTICON-EARTH</div>
+    <div id="classification-bar" class="classification-bar" aria-hidden="true">UNCLASSIFIED // OPEN SOURCE INTELLIGENCE // PANOPTICON-EARTH v2.0 // ALL FEEDS ACTIVE</div>
     <div id="cesiumContainer"></div>
     <div class="ambient-scanline" aria-hidden="true"></div>
     <div class="data-pulse-ring" aria-hidden="true"></div>
@@ -167,7 +186,7 @@
         <span class="logo-icon">◈</span>
         <div>
           <div class="logo-text">GOD'S EYE</div>
-          <div class="logo-sub">Global intelligence command center · live traffic · orbital monitoring</div>
+          <div class="logo-sub">Real-time global intelligence · ADS-B · AIS · OSINT · orbital tracking</div>
         </div>
       </div>
 
@@ -225,7 +244,7 @@
       </div>
       <div class="panel-header">
         <h2 class="panel-title">Global Layers</h2>
-        <span class="panel-kicker">Browse and filter global context</span>
+        <span class="panel-kicker">Toggle data feeds, traffic overlays, and camera views</span>
       </div>
 
       <section class="metric-cluster" id="metric-cluster"></section>
@@ -260,7 +279,7 @@
       </div>
       <div class="panel-header">
         <h2 class="panel-title">Controls</h2>
-        <span class="panel-kicker">View tuning, tracking, and feed status</span>
+        <span class="panel-kicker">Visual modes, entity tracking, live feeds, and layout management</span>
       </div>
 
       <section class="control-group">
@@ -289,7 +308,7 @@
 
       <section class="control-group">
         <h3>Selected Object</h3>
-        <div id="entity-info" class="entity-card empty">Select a track, satellite, ship, event, or zone on the globe.</div>
+        <div id="entity-info" class="entity-card empty">Click any entity on the globe to view telemetry, assessment, and tracking options.</div>
         <div class="entity-actions">
           <button id="track-selected" class="panel-btn primary" type="button" disabled>Track</button>
           <button id="release-track" class="panel-btn" type="button" disabled>Release</button>
@@ -307,8 +326,8 @@
         </div>
         <article id="ops-brief" class="ops-brief-card">
           <strong id="ops-brief-title">Operations Desk</strong>
-          <p id="ops-brief-copy">Use these tools to move around the map, inspect tracks, or write a quick summary of the current view.</p>
-          <small id="ops-brief-meta">Quick actions</small>
+          <p id="ops-brief-copy">Jump to a live alert zone, inspect an active track, or generate a situational brief for the current view. All data is real.</p>
+          <small id="ops-brief-meta">Hotspot · Track · Brief · Tour</small>
         </article>
       </section>
 
@@ -328,7 +347,7 @@
             <button id="clear-ais-endpoint" class="panel-btn" type="button">Clear</button>
             <button id="test-ais-endpoint" class="panel-btn" type="button">Test</button>
           </div>
-          <small id="feed-hint" class="feed-hint">ADS-B is live by default. AIS requires your own CORS-safe JSON endpoint.</small>
+          <small id="feed-hint" class="feed-hint">ADS-B aircraft data is live via OpenSky Network. AIS maritime tracking requires a CORS-safe JSON endpoint.</small>
         </div>
         <div class="entity-actions">
           <button id="refresh-feeds" class="panel-btn" type="button">Refresh Feeds</button>
@@ -362,7 +381,7 @@
         <span id="summary-stage">LIVE</span>
         <span id="summary-time">--:--:-- UTC</span>
       </div>
-      <p id="summary-copy">A map-first view of movement, alerts, and regional context.</p>
+      <p id="summary-copy">Live geospatial intelligence — track aircraft, vessels, satellites, and incidents in real time.</p>
       <div id="summary-tags" class="summary-tags"></div>
       <div id="summary-actions" class="summary-actions">
         <button id="summary-hotspot" class="panel-btn primary" type="button">Hotspot</button>
@@ -370,7 +389,7 @@
         <button id="summary-news" class="panel-btn" type="button">News</button>
         <button id="summary-guide" class="panel-btn" type="button">Guide</button>
       </div>
-      <p id="summary-hint" class="summary-hint">Use / to search, or start with a hotspot jump.</p>
+      <p id="summary-hint" class="summary-hint">Press / to search · click any entity to inspect · try a hotspot jump</p>
     </section>
 
     <section id="map-legend" class="glass-panel draggable-panel">
@@ -406,7 +425,7 @@
         </div>
       </div>
       <div id="live-status-center">
-        <span class="timeline-title" id="live-region-label">Global Surveillance Active</span>
+        <span class="timeline-title" id="live-region-label">Global Intelligence Active</span>
         <span id="live-last-refresh" class="live-caption">Feeds refreshing…</span>
         <span id="live-next-refresh" class="live-caption">Next refresh in --s</span>
         <div class="ticker-row">
@@ -515,7 +534,7 @@
     </div>
 
     <div class="news-footer">
-      <span class="news-powered">Powered by GDELT Project · Updated every 90 s</span>
+      <span class="news-powered">Intelligence powered by GDELT 2.0 DOC API · Auto-refresh every 90s</span>
       <a class="news-gdelt-link" href="https://www.gdeltproject.org" target="_blank" rel="noopener noreferrer">gdeltproject.org ↗</a>
     </div>
   </aside>

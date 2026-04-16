@@ -71,10 +71,10 @@ const SYSTEM_BOOKMARK_IDS = new Set(DEFAULT_BOOKMARKS.map(bookmark => bookmark.i
 const MISSION_GUIDE_STEPS = [
   {
     kicker: "Quick Start",
-    title: "Start here",
-    lead: "The easiest way to use this is to treat it like a live map desk: jump somewhere interesting, inspect what is nearby, and save anything you want to revisit.",
+    title: "Live intelligence, right now",
+    lead: "God's Eye pulls live ADS-B aircraft from OpenSky Network, real orbital tracks, maritime data, and GDELT 2.0 global news headlines — all rendered on a 3D WebGL globe with no backend required.",
     sections: [
-      { title: "Try First", items: ["Use search to jump to a place, alert, or saved view", "Use Next Hotspot to move through active regions", "Click a track or incident to open more detail"] }
+      { title: "Start Here", items: ["Hit Next Hotspot to jump to an active geopolitical alert zone", "Click any aircraft, satellite, vessel, or incident to open its Intel Sheet", "Open News Briefing to see live GDELT headlines linked to map events"] }
     ],
     actions: [
       { id: "hotspot", label: "Go To Hotspot" },
@@ -83,11 +83,11 @@ const MISSION_GUIDE_STEPS = [
   },
   {
     kicker: "Workflow",
-    title: "A typical session",
-    lead: "Most sessions follow the same pattern: find a region, narrow the view a bit, open intel on something specific, then save the layout if it is useful.",
+    title: "A typical intel session",
+    lead: "Jump to a hotspot, cross-reference live news headlines, inspect conflict intel when you click any coordinates, then save your layout for the next session.",
     sections: [
-      { title: "Usual Flow", items: ["Search or use a hotspot jump", "Use Focus or Compact if the screen feels busy", "Open Intel for the current selection", "Save a layout once the console looks right"] },
-      { title: "Shortcuts", items: ["Random Track is useful when you just want to explore", "Brief Focus gives you a quick summary of the current view", "Saved views and layouts help you return to the same setup later"] }
+      { title: "Core Loop", items: ["Next Hotspot → flies to an active alert with rotating narrative updates", "News Briefing → GDELT 2.0 headlines across 5 intelligence categories", "Click the globe → Conflict Intel Box surfaces nearby alerts by distance", "Brief Focus → generates a live situational summary of the current view"] },
+      { title: "Visual Modes", items: ["FX: Night Vision, Thermal, and CRT overlays for different briefing aesthetics", "Event Visuals: ephemeral conflict bursts spawn from live GDELT headlines", "Location HUD: real-time geocoding as you pan across any region"] }
     ],
     actions: [
       { id: "brief", label: "Create Brief" },
@@ -95,12 +95,12 @@ const MISSION_GUIDE_STEPS = [
     ]
   },
   {
-    kicker: "What It Is Good For",
-    title: "Where it fits",
-    lead: "It works well as a spatial briefing tool. You can use it to follow a region, add map context to headlines, or present a more interactive portfolio piece.",
+    kicker: "What It Is",
+    title: "A real intelligence platform",
+    lead: "Built entirely in vanilla JS and CesiumJS — no framework, no backend. Every aircraft is a live ADS-B transponder. Every news event is a real GDELT headline. Every conflict burst is algorithmically tied to live geospatial data.",
     sections: [
-      { title: "Good Uses", items: ["Following signals around a region", "Turning current events into map context", "Showing your thinking through an interface that feels hands-on"] },
-      { title: "Keep It Useful", items: ["Save views for places you return to", "Save layouts for different kinds of sessions", "Use the tour or news panel when you want a little guidance"] }
+      { title: "Live Data Sources", items: ["OpenSky Network: real ADS-B transponder data, globally, every 90s", "GDELT 2.0 DOC API: 100+ language global media corpus, 5 categories", "OpenStreetMap Nominatim: geocoding for click-to-inspect coordinate popups"] },
+      { title: "Technical Highlights", items: ["CesiumJS 3D globe with WebGL bloom, FXAA, and day/night globe lighting", "Persistent layouts, bookmarks, and FX settings via localStorage", "Draggable glass-morphism HUD with live threat-level computation"] }
     ],
     actions: [
       { id: "tour", label: "Start Tour" },
@@ -1869,7 +1869,7 @@ function updateLiveMetrics() {
   if (elements.hudTrackCount) elements.hudTrackCount.textContent = `${visibleTraffic} tracks`;
   if (elements.hudAlertCount) elements.hudAlertCount.textContent = `${activeAlerts} alerts`;
   if (elements.hudStatusText) elements.hudStatusText.textContent = "LIVE";
-  if (elements.liveRegionLabel) elements.liveRegionLabel.textContent = "Global Surveillance Active";
+  if (elements.liveRegionLabel) elements.liveRegionLabel.textContent = "Global Intelligence Active";
   if (elements.hudStatusMode) elements.hudStatusMode.textContent = "LIVE FEED";
 
   if (elements.summaryStage) elements.summaryStage.textContent = "LIVE";

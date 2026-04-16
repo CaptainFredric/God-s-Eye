@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
-  "description": "Google-Earth-like geospatial intelligence globe with layered simulated traffic, replay controls, and cinematic monitoring tools.",
+  "description": "Real-time 3D global intelligence command center — track live ADS-B aircraft, satellites, maritime routes, and geopolitical incidents on an interactive CesiumJS globe.",
   "scripts": {
     "dev": "vite",
     "start": "vite",
