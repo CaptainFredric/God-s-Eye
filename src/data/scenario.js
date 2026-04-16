@@ -50,7 +50,8 @@ export const LAYERS = [
   { id: "satellites", label: "Satellites", description: "Orbital passes with path trails", color: "#af9dff", enabled: true },
   { id: "maritime", label: "Maritime", description: "Tankers, cargo, and shipping lanes", color: "#60f7bf", enabled: true },
   { id: "incidents", label: "Incident Nodes", description: "Strikes, blackouts, and pressure points", color: "#ff6d8d", enabled: true },
-  { id: "zones", label: "Jamming / Closures", description: "Active disruption and exclusion zones", color: "#ffc0cb", enabled: true }
+  { id: "zones", label: "Jamming / Closures", description: "Active disruption and exclusion zones", color: "#ffc0cb", enabled: true },
+  { id: "location", label: "My Location", description: "IP-based position marker (opt-in)", color: "#00ff88", enabled: false }
 ];
 
 export const DEFAULT_BOOKMARKS = [

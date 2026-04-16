@@ -1719,7 +1719,7 @@ function renderLayerToggles() {
     const row = document.createElement("button");
     row.type = "button";
     row.className = `layer-toggle${active ? " active" : ""}`;
-    // Count entities in this layer
+    row.dataset.layerId = layer.id;
     let count = 0;
     try {
       const entities = viewer?.entities?.values;
@@ -2862,6 +2862,7 @@ function refreshEntityVisibility() {
   dynamic.liveTraffic.forEach(entity => {
     entity.show = !!state.layers[entity.properties.layerId.getValue(viewer.clock.currentTime)];
   });
+  updateMyLocation();
 }
 
 function updateZones() {
@@ -2876,6 +2877,128 @@ function updateIncidents() {
     cone.show = !!state.layers.incidents;
     trail.show = !!state.layers.incidents;
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MY LOCATION — optional IP-geolocation marker (opt-in via Layers panel)
+// ─────────────────────────────────────────────────────────────────────────────
+let _myLocationEntities = []; // [dot, ring, label]
+let _myLocationFetched  = false;
+let _myLocationData     = null; // { lat, lng, city, country, ip }
+
+async function fetchIpLocation() {
+  try {
+    const res = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+    if (!d.success || !d.latitude || !d.longitude) throw new Error("No location");
+    return { lat: d.latitude, lng: d.longitude, city: d.city || "", country: d.country || "", ip: d.ip || "" };
+  } catch (_) {
+    // Fallback: second provider
+    try {
+      const res2 = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout ? AbortSignal.timeout(8000) : undefined });
+      if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+      const d2 = await res2.json();
+      if (!d2.latitude || !d2.longitude) throw new Error("No location");
+      return { lat: d2.latitude, lng: d2.longitude, city: d2.city || "", country: d2.country_name || "", ip: d2.ip || "" };
+    } catch (_2) { return null; }
+  }
+}
+
+function placeMyLocationMarker(data) {
+  removeMyLocationMarker();
+  const { lat, lng, city, country } = data;
+  const pos = Cesium.Cartesian3.fromDegrees(lng, lat, 800);
+
+  // Pulsing dot
+  const dot = viewer.entities.add({
+    position: pos,
+    point: {
+      pixelSize: 11,
+      color: Cesium.Color.fromCssColorString("#00ff88").withAlpha(0.95),
+      outlineColor: Cesium.Color.fromCssColorString("#ffffff").withAlpha(0.9),
+      outlineWidth: 2,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY
+    },
+    properties: { layerId: "location", entityType: "my-location" }
+  });
+
+  // Outer ring
+  const ring = viewer.entities.add({
+    position: pos,
+    ellipse: {
+      semiMajorAxis: 55000,
+      semiMinorAxis: 55000,
+      height: 0,
+      material: Cesium.Color.fromCssColorString("#00ff88").withAlpha(0.08),
+      outline: true,
+      outlineColor: Cesium.Color.fromCssColorString("#00ff88").withAlpha(0.55),
+      outlineWidth: 1.5
+    },
+    properties: { layerId: "location", entityType: "my-location-ring" }
+  });
+
+  // Label
+  const locationLabel = city ? `${city}, ${country}` : country || "Unknown";
+  const label = viewer.entities.add({
+    position: pos,
+    label: {
+      text: `◎ YOU ARE HERE\n${locationLabel}`,
+      font: "11px 'Share Tech Mono', monospace",
+      fillColor: Cesium.Color.fromCssColorString("#00ff88"),
+      outlineColor: Cesium.Color.BLACK,
+      outlineWidth: 2,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      pixelOffset: new Cesium.Cartesian2(0, -24),
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString("#0a0e1a").withAlpha(0.75),
+      backgroundPadding: new Cesium.Cartesian2(6, 4),
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      scale: 1.0
+    },
+    properties: { layerId: "location", entityType: "my-location-label" }
+  });
+
+  _myLocationEntities = [dot, ring, label];
+}
+
+function removeMyLocationMarker() {
+  for (const e of _myLocationEntities) {
+    try { viewer.entities.remove(e); } catch (_) { /* */ }
+  }
+  _myLocationEntities = [];
+}
+
+async function enableMyLocation() {
+  if (!_myLocationFetched) {
+    showToast("Locating via IP address…", "info");
+    const data = await fetchIpLocation();
+    _myLocationFetched = true;
+    if (data) {
+      _myLocationData = data;
+      placeMyLocationMarker(data);
+      showToast(`Location resolved: ${data.city || data.country}`, "info");
+    } else {
+      showToast("Could not resolve IP location", "warning");
+      // Turn the layer back off silently
+      state.layers.location = false;
+      saveJson(STORAGE_KEYS.layers, state.layers);
+      renderLayerToggles();
+    }
+  } else if (_myLocationData) {
+    placeMyLocationMarker(_myLocationData);
+  }
+}
+
+function updateMyLocation() {
+  const on = !!state.layers.location;
+  if (on) {
+    enableMyLocation();
+  } else {
+    removeMyLocationMarker();
+  }
 }
 
 function updateLiveMetrics() {
