@@ -545,43 +545,187 @@ body.surgical-zoom-landing .intel-sheet {
   color: var(--muted);
 }
 
-/* ── Support / Buy Me a Coffee button ─────────────────────────────────── */
-.support-btn {
+/* ── Support widget ──────────────────────────────────────────────────── */
+.support-wrap {
   position: fixed;
   bottom: 50px;
   left: 12px;
   z-index: 52;
+}
+
+.support-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid rgba(255, 180, 50, 0.2);
-  border-radius: 4px;
-  background: rgba(255, 180, 50, 0.06);
-  color: #ffb432;
-  font-family: "Share Tech Mono", monospace;
-  font-size: 0.65rem;
-  letter-spacing: 0.06em;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 185, 50, 0.3);
+  border-radius: 5px;
+  background: rgba(255, 175, 40, 0.08);
+  color: #ffc055;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
   cursor: pointer;
-  transition: background var(--anim-fast) ease, border-color var(--anim-fast) ease, transform var(--anim-fast) ease;
+  transition: background var(--anim-fast) ease, border-color var(--anim-fast) ease,
+              box-shadow var(--anim-fast) ease, transform var(--anim-fast) ease;
+  animation: supportGlow 3.8s ease-in-out infinite;
+  position: relative;
 }
 .support-btn:hover {
-  background: rgba(255, 180, 50, 0.15);
-  border-color: rgba(255, 180, 50, 0.4);
-  transform: translateY(-1px);
+  background: rgba(255, 185, 50, 0.17);
+  border-color: rgba(255, 195, 70, 0.62);
+  box-shadow: 0 0 20px rgba(255, 180, 50, 0.28), 0 0 6px rgba(255, 210, 80, 0.1);
+  transform: translateY(-2px);
+  animation: none;
 }
+
+@keyframes supportGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(255, 175, 40, 0.06); border-color: rgba(255, 185, 50, 0.3); }
+  50%       { box-shadow: 0 0 16px rgba(255, 180, 50, 0.22), 0 0 30px rgba(255, 200, 70, 0.08); border-color: rgba(255, 185, 50, 0.52); }
+}
+
+.support-btn.support-attention {
+  animation: supportAttention 0.9s ease-in-out 3;
+}
+@keyframes supportAttention {
+  0%, 100% { box-shadow: none; transform: scale(1); }
+  50%       { box-shadow: 0 0 28px rgba(255, 185, 50, 0.45), 0 0 8px rgba(255, 210, 80, 0.2); transform: scale(1.04); border-color: rgba(255, 195, 70, 0.75); }
+}
+
 .support-icon {
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1;
 }
+
+/* ── Support hover card ──────────────────────────────────────────────── */
+.support-card {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  width: 248px;
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(255, 185, 50, 0.26);
+  border-radius: 6px;
+  background: linear-gradient(145deg, rgba(12, 9, 2, 0.97) 0%, rgba(20, 14, 3, 0.97) 100%);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(255, 180, 50, 0.07),
+              inset 0 1px 0 rgba(255, 185, 50, 0.08);
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  transform-origin: bottom left;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.support-wrap:hover .support-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+/* Arrow pointer */
+.support-card::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 22px;
+  width: 10px;
+  height: 10px;
+  background: rgba(18, 13, 3, 0.97);
+  border-right: 1px solid rgba(255, 185, 50, 0.26);
+  border-bottom: 1px solid rgba(255, 185, 50, 0.26);
+  transform: rotate(45deg);
+}
+
+.support-card-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+.support-card-glyph {
+  font-size: 1.05rem;
+  color: var(--cyan);
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(0, 210, 255, 0.5);
+}
+.support-card-title {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(255, 248, 230, 0.9);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  flex: 1;
+}
+.support-card-live {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  color: var(--teal);
+  border: 1px solid rgba(0, 255, 200, 0.35);
+  border-radius: 3px;
+  padding: 1px 5px;
+  animation: liveBlink 1.8s ease-in-out infinite;
+}
+@keyframes liveBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+.support-card-copy {
+  font-family: var(--font-main);
+  font-size: 0.7rem;
+  line-height: 1.52;
+  color: rgba(200, 215, 255, 0.6);
+  margin: 0 0 10px;
+}
+.support-card-stats {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  margin-bottom: 12px;
+}
+.support-card-stats span {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: rgba(200, 215, 255, 0.45);
+  letter-spacing: 0.04em;
+  flex: 1 0 auto;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+.support-card-stats strong {
+  color: var(--cyan);
+}
+.support-card-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  background: rgba(255, 180, 50, 0.1);
+  border: 1px solid rgba(255, 190, 60, 0.32);
+  border-radius: 4px;
+  color: #ffd070;
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: background var(--anim-fast) ease;
+  cursor: pointer;
+}
+.support-card-cta:hover {
+  background: rgba(255, 180, 50, 0.22);
+}
+
 @media (max-width: 520px) {
-  .support-btn {
+  .support-wrap {
     bottom: calc(66px + env(safe-area-inset-bottom, 0px));
     left: 8px;
-    padding: 5px 8px;
-    font-size: 0.58rem;
+  }
+  .support-btn {
+    padding: 5px 9px;
+    font-size: 0.59rem;
   }
   .support-label {
     display: none;
@@ -590,8 +734,11 @@ body.surgical-zoom-landing .intel-sheet {
     bottom: calc(66px + env(safe-area-inset-bottom, 0px));
     right: 8px;
   }
+  .support-card {
+    width: 220px;
+  }
 }
-.declutter-ui .support-btn {
+.declutter-ui .support-wrap {
   display: none;
 }
 
@@ -1306,11 +1453,11 @@ canvas {
   z-index: 20;
   border: 1px solid var(--panel-border);
   background:
-    linear-gradient(180deg, rgba(6, 14, 28, 0.94), rgba(3, 8, 16, 0.9)),
-    radial-gradient(ellipse at top left, rgba(0, 210, 255, 0.07), transparent 42%),
-    radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.04), transparent 38%);
-  backdrop-filter: blur(18px) saturate(130%);
-  box-shadow: var(--shadow), var(--shadow-glow), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    linear-gradient(180deg, rgba(6, 14, 28, 0.96), rgba(3, 8, 16, 0.92)),
+    radial-gradient(ellipse at top left, rgba(0, 210, 255, 0.09), transparent 42%),
+    radial-gradient(ellipse at bottom right, rgba(167, 139, 250, 0.05), transparent 38%);
+  backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: var(--shadow), var(--shadow-glow), inset 0 1px 0 rgba(0, 210, 255, 0.09);
   transition: transform var(--anim-med) cubic-bezier(0.22, 1, 0.36, 1), border-color var(--anim-med) ease, box-shadow var(--anim-med) ease;
   clip-path: polygon(0 16px, 16px 0, calc(100% - 22px) 0, 100% 22px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px));
   overflow: hidden;
@@ -1684,8 +1831,8 @@ canvas {
   gap: 8px;
   padding: 8px 11px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   font-size: 0.72rem;
   color: var(--muted);
   transition: border-color 0.25s ease, background 0.25s ease;
@@ -5214,8 +5361,8 @@ body.compact-ui .control-group + .control-group {
   align-items: center;
   justify-content: center;
   background: linear-gradient(90deg, rgba(0, 30, 50, 0.6), rgba(0, 20, 40, 0.4), rgba(0, 30, 50, 0.6));
-  border-bottom: 1px solid rgba(0, 210, 255, 0.07);
-  color: rgba(100, 190, 240, 0.4);
+  border-bottom: 1px solid rgba(0, 210, 255, 0.1);
+  color: rgba(100, 190, 240, 0.45);
   font: 400 0.42rem "Share Tech Mono", monospace;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -5224,6 +5371,22 @@ body.compact-ui .control-group + .control-group {
   overflow: hidden;
   text-overflow: ellipsis;
   transition: background 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+}
+/* scan sweep across the bar */
+.classification-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -80px;
+  width: 80px;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 210, 255, 0.18), transparent);
+  animation: classBarScan 8s linear infinite;
+  pointer-events: none;
+}
+@keyframes classBarScan {
+  0%   { left: -80px; }
+  100% { left: calc(100% + 80px); }
 }
 .classification-bar.threat-elevated {
   background: linear-gradient(90deg, rgba(50, 40, 0, 0.6), rgba(40, 30, 0, 0.4), rgba(50, 40, 0, 0.6));

@@ -8251,3 +8251,42 @@ function initCompassRose() {
     });
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPPORT WIDGET — live entity counter + periodic attention pulse + welcome toast
+// ─────────────────────────────────────────────────────────────────────────────
+function initSupportWidget() {
+  const btn = document.getElementById("support-btn");
+  const scEntities = document.getElementById("sc-entities");
+
+  // Keep entity count fresh in the hover card
+  function updateSupportEntityCount() {
+    if (!scEntities) return;
+    const count = viewer ? viewer.entities.values.length : 0;
+    scEntities.textContent = count > 0 ? count.toLocaleString() : "—";
+  }
+  updateSupportEntityCount();
+  setInterval(updateSupportEntityCount, 5000);
+
+  // Periodic attention pulse — 90 s after load, then every 2.5 min
+  if (btn) {
+    setTimeout(() => {
+      btn.classList.add("support-attention");
+      btn.addEventListener("animationend", () => btn.classList.remove("support-attention"), { once: true });
+      setInterval(() => {
+        btn.classList.add("support-attention");
+        btn.addEventListener("animationend", () => btn.classList.remove("support-attention"), { once: true });
+      }, 150000); // every 2.5 min
+    }, 90000); // first pulse after 1.5 min
+  }
+
+  // One-time welcome toast after 3 min — only if not suppressed
+  const SUPPORT_TOAST_KEY = "panopticon-earth-support-toast-v1";
+  if (!sessionStorage.getItem(SUPPORT_TOAST_KEY)) {
+    sessionStorage.setItem(SUPPORT_TOAST_KEY, "1");
+    setTimeout(() => {
+      showToast("God's Eye is free & open-source — ☕ support keeps it running", "info");
+    }, 180000); // 3 min
+  }
+}
+initSupportWidget();

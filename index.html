@@ -954,10 +954,26 @@
   <button id="btn-audio-toggle" class="audio-toggle" type="button" title="Toggle audio">🔊</button>
 
   <!-- Support widget -->
-  <a id="support-btn" class="support-btn" href="https://buymeacoffee.com/captainfredric" target="_blank" rel="noopener noreferrer" title="Support this project">
-    <span class="support-icon">☕</span>
-    <span class="support-label">Buy me a coffee</span>
-  </a>
+  <div class="support-wrap" id="support-wrap">
+    <div class="support-card" aria-hidden="true">
+      <div class="support-card-row">
+        <span class="support-card-glyph">◈</span>
+        <span class="support-card-title">God's Eye</span>
+        <span class="support-card-live">LIVE</span>
+      </div>
+      <p class="support-card-copy">Real-time ADS-B aircraft · AIS vessels · orbital tracks · OSINT incidents. Built solo. Free forever. No ads.</p>
+      <div class="support-card-stats">
+        <span><strong id="sc-entities">—</strong> entities tracked</span>
+        <span><strong>5</strong> live feeds</span>
+        <span><strong>24/7</strong> uptime</span>
+      </div>
+      <div class="support-card-cta">☕ Buy me a coffee →</div>
+    </div>
+    <a id="support-btn" class="support-btn" href="https://buymeacoffee.com/captainarm1" target="_blank" rel="noopener noreferrer" aria-label="Support this project on Buy Me A Coffee">
+      <span class="support-icon">☕</span>
+      <span class="support-label">Support</span>
+    </a>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
   <script type="module" src="./src/main.js"></script>
