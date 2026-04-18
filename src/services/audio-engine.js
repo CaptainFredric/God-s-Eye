@@ -250,6 +250,138 @@ function typeKey() {
   src.start(now);
 }
 
+// ── Panel Open — soft ascending chime ────────────────────────────────────
+
+function panelOpen() {
+  if (!ensureCtx()) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(600, now);
+  osc.frequency.exponentialRampToValueAtTime(1200, now + 0.12);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.06, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  osc.connect(g).connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.2);
+}
+
+// ── Panel Close — soft descending tone ───────────────────────────────────
+
+function panelClose() {
+  if (!ensureCtx()) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(1000, now);
+  osc.frequency.exponentialRampToValueAtTime(500, now + 0.12);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.05, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+  osc.connect(g).connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.18);
+}
+
+// ── Toggle On — quick bright blip ────────────────────────────────────────
+
+function toggleOn() {
+  if (!ensureCtx()) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(880, now);
+  osc.frequency.exponentialRampToValueAtTime(1320, now + 0.05);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.07, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  osc.connect(g).connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.1);
+}
+
+// ── Toggle Off — quick dim blip ──────────────────────────────────────────
+
+function toggleOff() {
+  if (!ensureCtx()) return;
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(880, now);
+  osc.frequency.exponentialRampToValueAtTime(550, now + 0.05);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.06, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+  osc.connect(g).connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.1);
+}
+
+// ── Notify — soft two-tone chime for toasts ──────────────────────────────
+
+function notify() {
+  if (!ensureCtx()) return;
+  const now = ctx.currentTime;
+  [0, 0.08].forEach((offset, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = i === 0 ? 1047 : 1319;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.05, now + offset);
+    g.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
+    osc.connect(g).connect(masterGain);
+    osc.start(now + offset);
+    osc.stop(now + offset + 0.14);
+  });
+}
+
+// ── Success — pleasant ascending triad ───────────────────────────────────
+
+function success() {
+  if (!ensureCtx()) return;
+  const now = ctx.currentTime;
+  [523, 659, 784].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, now + i * 0.07);
+    g.gain.linearRampToValueAtTime(0.05, now + i * 0.07 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.18);
+    osc.connect(g).connect(masterGain);
+    osc.start(now + i * 0.07);
+    osc.stop(now + i * 0.07 + 0.2);
+  });
+}
+
+// ── Zoom Tick — subtle tick for scroll-wheel zoom ────────────────────────
+
+let _lastZoomTick = 0;
+function zoomTick() {
+  if (!ensureCtx()) return;
+  const now = performance.now();
+  if (now - _lastZoomTick < 120) return; // throttle: max ~8 per second
+  _lastZoomTick = now;
+  const t = ctx.currentTime;
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.02), ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.12));
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 2800;
+  bp.Q.value = 1.5;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.04, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+  src.connect(bp).connect(g).connect(masterGain);
+  src.start(t);
+}
+
 // ── Public API ───────────────────────────────────────────────────────────
 
 export const sfx = {
@@ -258,6 +390,13 @@ export const sfx = {
   zoom,
   alert,
   type: typeKey,
+  panelOpen,
+  panelClose,
+  toggleOn,
+  toggleOff,
+  notify,
+  success,
+  zoomTick,
   startAmbient: startAmbient,
   stopAmbient: stopAmbient
 };

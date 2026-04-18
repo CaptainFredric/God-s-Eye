@@ -1684,6 +1684,7 @@ function renderLegend() {
 
 function applyDeclutterMode() {
   document.body.classList.toggle("declutter-ui", state.declutter);
+  state.declutter ? sfx.toggleOn() : sfx.toggleOff();
   if (elements.btnDeclutter) {
     elements.btnDeclutter.classList.toggle("active", state.declutter);
     elements.btnDeclutter.textContent = state.declutter ? "FOCUS ON" : "FOCUS";
@@ -1693,6 +1694,7 @@ function applyDeclutterMode() {
 
 function applyDensityMode() {
   document.body.classList.toggle("compact-ui", state.compact);
+  state.compact ? sfx.toggleOn() : sfx.toggleOff();
   if (elements.btnDensity) {
     elements.btnDensity.classList.toggle("active", state.compact);
     elements.btnDensity.textContent = state.compact ? "COMPACT ON" : "COMPACT";
@@ -3189,6 +3191,7 @@ function openIntelSheet(entity) {
 function closeIntelSheet() {
   state.intelSheetOpen = false;
   state._intelSheetInfo = null;
+  sfx.panelClose();
   document.body.classList.remove("intel-sheet-open");
   if (!elements.intelSheet) return;
   elements.intelSheet.classList.add("hidden");
@@ -3212,7 +3215,10 @@ async function testAisEndpoint() {
 }
 
 function setMobileDrawer(drawer) {
+  const wasOpen = !!state.activeDrawer;
   state.activeDrawer = state.activeDrawer === drawer ? null : drawer;
+  if (state.activeDrawer && !wasOpen) sfx.panelOpen();
+  else if (!state.activeDrawer && wasOpen) sfx.panelClose();
   document.body.classList.toggle("mobile-drawer-open",    !!state.activeDrawer);
   document.body.classList.toggle("mobile-layers-open",   state.activeDrawer === "layers");
   document.body.classList.toggle("mobile-controls-open", state.activeDrawer === "controls");
@@ -3612,6 +3618,7 @@ function saveCurrentBookmark() {
   };
   state.bookmarks = [...state.bookmarks, next].slice(-8);
   saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
+  sfx.success();
   renderBookmarks();
 }
 
@@ -3902,14 +3909,13 @@ function initCinematicUi() {
     node.addEventListener("mouseenter", () => pulseConsoleFrame("hover"));
   });
 
+  // ── Settings gear button ──
+  document.getElementById("btn-settings")?.addEventListener("click", openSettings);
+  document.getElementById("btn-mobile-settings")?.addEventListener("click", openSettings);
+
   // ── Audio toggle button ──
   const audioBtn = document.getElementById("btn-audio-toggle");
   if (audioBtn) {
-    const syncAudioIcon = () => {
-      const on = isAudioEnabled();
-      audioBtn.textContent = on ? "🔊" : "🔇";
-      audioBtn.classList.toggle("muted", !on);
-    };
     syncAudioIcon();
     audioBtn.addEventListener("click", () => {
       initAudioEngine();
@@ -3945,7 +3951,7 @@ function initTerminalCli() {
   function toggleCli(show) {
     cliVisible = typeof show === "boolean" ? show : !cliVisible;
     cliWrap.classList.toggle("hidden", !cliVisible);
-    if (cliVisible) cliInput.focus();
+    if (cliVisible) { sfx.panelOpen(); cliInput.focus(); } else { sfx.panelClose(); }
   }
 
   // Backtick (`) or Ctrl+/ toggles the terminal
@@ -5401,7 +5407,7 @@ function registerEvents() {
     updateTrackButtons();
   });
 
-  elements.searchButton?.addEventListener("click",  () => runSearch(elements.searchInput.value));
+  elements.searchButton?.addEventListener("click",  () => { sfx.click(); runSearch(elements.searchInput.value); });
   elements.searchInput?.addEventListener("input", event => {
     if (state.searchDebounceTimer) window.clearTimeout(state.searchDebounceTimer);
     state.searchDebounceTimer = window.setTimeout(() => runSearch(event.target.value), 220);
@@ -5478,6 +5484,7 @@ function registerEvents() {
   });
   elements.btnTilt?.addEventListener("click",  () => {
     state.tiltMode = !state.tiltMode;
+    state.tiltMode ? sfx.toggleOn() : sfx.toggleOff();
     elements.btnTilt.classList.toggle("active", state.tiltMode);
     viewer.camera.flyTo({
       destination: viewer.camera.positionWC,
@@ -5491,6 +5498,7 @@ function registerEvents() {
   });
   elements.btnSpin?.addEventListener("click",  () => {
     state.spinning = !state.spinning;
+    state.spinning ? sfx.toggleOn() : sfx.toggleOff();
     elements.btnSpin.classList.toggle("active", state.spinning);
   });
 
@@ -5545,7 +5553,7 @@ function registerEvents() {
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
   handler.setInputAction(() => pausePassiveSpin(6500), Cesium.ScreenSpaceEventType.LEFT_DOWN);
-  handler.setInputAction(() => pausePassiveSpin(6500), Cesium.ScreenSpaceEventType.WHEEL);
+  handler.setInputAction(() => { pausePassiveSpin(6500); sfx.zoomTick(); }, Cesium.ScreenSpaceEventType.WHEEL);
 
   // Double-click: fly to clicked entity for close inspection, or fly to globe location
   handler.setInputAction(click => {
@@ -5643,8 +5651,9 @@ function registerEvents() {
     if (event.key.toLowerCase() === "w") { toggleGlobeGrid(); return; }
     if (event.key.toLowerCase() === "m") { toggleAudioMute(); return; }
     if (event.key.toLowerCase() === "c") { toggleCinemaMode(); return; }
+    if (event.key === ",")               { openSettings(); return; }
     if (event.key === " ")               { event.preventDefault(); toggleAutoRotatePause(); return; }
-    if (event.key === "Escape")          { closeIntelSheet(); elements.searchResults.classList.add("hidden"); closeNewsPanel(); document.getElementById("shortcuts-overlay")?.classList.add("hidden"); }
+    if (event.key === "Escape")          { closeSettings(); closeIntelSheet(); elements.searchResults.classList.add("hidden"); closeNewsPanel(); document.getElementById("shortcuts-overlay")?.classList.add("hidden"); }
   });
   document.addEventListener("keyup", event => { state._shiftHeld = event.shiftKey; });
 
@@ -5691,6 +5700,7 @@ function registerEvents() {
       orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
       duration: 0.6
     });
+    sfx.zoom();
     pausePassiveSpin(4000);
   });
 
@@ -5702,6 +5712,7 @@ function registerEvents() {
       orientation: { heading: viewer.camera.heading, pitch: viewer.camera.pitch, roll: 0 },
       duration: 0.6
     });
+    sfx.zoom();
     pausePassiveSpin(4000);
   });
 
@@ -5826,6 +5837,7 @@ function toggleNewsPanel() {
 function openNewsPanel() {
   if (window.innerWidth <= 980) setMobileDrawer(null);
   state.newsOpen = true;
+  sfx.panelOpen();
   elements.newsBriefing?.classList.remove("hidden");
   elements.newsToggleBtn?.classList.add("active");
   startNewsCategoryRotation();
@@ -5842,6 +5854,7 @@ function openNewsPanel() {
 function closeNewsPanel() {
   if (!state.newsOpen) return;
   state.newsOpen = false;
+  sfx.panelClose();
   elements.newsBriefing?.classList.add("hidden");
   elements.newsToggleBtn?.classList.remove("active");
   stopNewsCategoryRotation();
@@ -6179,6 +6192,7 @@ function startNewsTicker() {
 }
 
 function startNewsCategoryRotation() {
+  if (!_settingsPrefs.newsAutoRotate) return;
   if (state.newsCategoryTimer) window.clearInterval(state.newsCategoryTimer);
   state.newsCategoryTimer = window.setInterval(() => {
     if (!state.newsOpen || state.newsPanelHovering || state.newsCategoryPaused) return;
@@ -6759,6 +6773,394 @@ function toggleKeyboardShortcuts() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS PANEL — Centralised settings overlay
+// ─────────────────────────────────────────────────────────────────────────────
+const _settingsPrefs = {
+  newsToasts: true,
+  newsAutoRotate: true,
+  ambientAudio: true,
+  uiSfx: true,
+  notifySfx: true,
+  scanlines: true,
+  gpuHints: true,
+  smoothScroll: true,
+  consoleFrame: true,
+  compass: true,
+  reticle: true,
+  footer: true,
+  summaryPanel: true
+};
+
+// Wrap sfx calls so UI/notify prefs are respected
+const _origSfxPanelOpen  = sfx.panelOpen;
+const _origSfxPanelClose = sfx.panelClose;
+const _origSfxToggleOn   = sfx.toggleOn;
+const _origSfxToggleOff  = sfx.toggleOff;
+const _origSfxClick      = sfx.click;
+const _origSfxZoomTick   = sfx.zoomTick;
+const _origSfxZoom       = sfx.zoom;
+const _origSfxNotify     = sfx.notify;
+const _origSfxSuccess    = sfx.success;
+const _origSfxType       = sfx.type;
+const _origSfxPing       = sfx.ping;
+
+function _wrapSfxPrefs() {
+  sfx.panelOpen  = () => { if (_settingsPrefs.uiSfx) _origSfxPanelOpen(); };
+  sfx.panelClose = () => { if (_settingsPrefs.uiSfx) _origSfxPanelClose(); };
+  sfx.toggleOn   = () => { if (_settingsPrefs.uiSfx) _origSfxToggleOn(); };
+  sfx.toggleOff  = () => { if (_settingsPrefs.uiSfx) _origSfxToggleOff(); };
+  sfx.click      = () => { if (_settingsPrefs.uiSfx) _origSfxClick(); };
+  sfx.zoomTick   = () => { if (_settingsPrefs.uiSfx) _origSfxZoomTick(); };
+  sfx.zoom       = () => { if (_settingsPrefs.uiSfx) _origSfxZoom(); };
+  sfx.type       = () => { if (_settingsPrefs.uiSfx) _origSfxType(); };
+  sfx.ping       = () => { if (_settingsPrefs.uiSfx) _origSfxPing(); };
+  sfx.notify     = () => { if (_settingsPrefs.notifySfx) _origSfxNotify(); };
+  sfx.success    = () => { if (_settingsPrefs.notifySfx) _origSfxSuccess(); };
+}
+_wrapSfxPrefs();
+
+function openSettings() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+  overlay.classList.remove("hidden");
+  sfx.panelOpen();
+  _syncSettingsUI();
+  if (!overlay._wired) {
+    overlay._wired = true;
+    _wireSettingsPanel(overlay);
+  }
+}
+
+function closeSettings() {
+  const overlay = document.getElementById("settings-overlay");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  sfx.panelClose();
+}
+
+function _syncSettingsUI() {
+  // Display tab
+  const el = (id) => document.getElementById(id);
+  _setCheck("set-declutter", state.declutter);
+  _setCheck("set-compact", state.compact);
+  _setCheck("set-ultra-dark", _ultraDark);
+  _setCheck("set-cinema", document.body.classList.contains("cinema-mode"));
+  _setCheck("set-scanlines", _settingsPrefs.scanlines);
+
+  // FX
+  const fxSel = el("set-fx-mode");
+  if (fxSel) fxSel.value = state.fxMode;
+  _setRange("set-fx-intensity", state.fxIntensity);
+  _setRange("set-fx-glow", state.fxGlow);
+
+  // Basemap buttons
+  const bmRow = el("set-basemap-row");
+  if (bmRow) {
+    bmRow.innerHTML = "";
+    BASEMAPS.forEach(bm => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `settings-basemap-btn${state.basemapId === bm.id ? " active" : ""}`;
+      btn.textContent = bm.label;
+      btn.addEventListener("click", () => {
+        installBasemap(bm.id);
+        renderBasemapButtons();
+        _syncSettingsUI();
+      });
+      bmRow.appendChild(btn);
+    });
+  }
+
+  // Globe tab
+  _setCheck("set-spin", state.spinning);
+  _setCheck("set-tilt", state.tiltMode);
+  _setCheck("set-globe-grid", !!_gridLayer);
+  _setCheck("set-console-frame", _settingsPrefs.consoleFrame);
+  _setCheck("set-compass", _settingsPrefs.compass);
+  _setCheck("set-reticle", _settingsPrefs.reticle);
+  _setCheck("set-footer", _settingsPrefs.footer);
+  _setCheck("set-summary-panel", _settingsPrefs.summaryPanel);
+
+  // Layers
+  const layersList = el("set-layers-list");
+  if (layersList) {
+    layersList.innerHTML = "";
+    LAYERS.forEach(layer => {
+      const lbl = document.createElement("label");
+      lbl.className = "settings-toggle";
+      lbl.innerHTML = `<span>${layer.label}</span><input type="checkbox" ${state.layers[layer.id] ? "checked" : ""} data-settings-layer="${layer.id}" /><span class="settings-switch"></span>`;
+      lbl.querySelector("input").addEventListener("change", (e) => {
+        state.layers[layer.id] = e.target.checked;
+        saveJson(STORAGE_KEYS.layers, state.layers);
+        renderLayerToggles();
+        renderLegend();
+        refreshEntityVisibility();
+      });
+      layersList.appendChild(lbl);
+    });
+  }
+
+  // Data tab
+  _setRange("set-refresh-interval", state.refreshIntervalSec, `${state.refreshIntervalSec}s`);
+  _setCheck("set-news-toasts", _settingsPrefs.newsToasts);
+  _setCheck("set-news-autorotate", _settingsPrefs.newsAutoRotate);
+
+  const aisInput = el("set-ais-endpoint");
+  if (aisInput) aisInput.value = getConfiguredAisEndpoint() || "";
+
+  // Audio tab
+  _setCheck("set-audio-enabled", isAudioEnabled());
+  _setCheck("set-ambient", _settingsPrefs.ambientAudio);
+  _setCheck("set-ui-sfx", _settingsPrefs.uiSfx);
+  _setCheck("set-notify-sfx", _settingsPrefs.notifySfx);
+
+  // Advanced tab
+  _setCheck("set-gpu-hints", _settingsPrefs.gpuHints);
+  _setCheck("set-smooth-scroll", _settingsPrefs.smoothScroll);
+}
+
+function _setCheck(id, val) {
+  const cb = document.getElementById(id);
+  if (cb) cb.checked = !!val;
+}
+
+function _setRange(id, val, display) {
+  const sl = document.getElementById(id);
+  if (sl) sl.value = val;
+  const vEl = document.getElementById(id + "-val");
+  if (vEl) vEl.textContent = display ?? String(val);
+}
+
+function _wireSettingsPanel(overlay) {
+  const el = (id) => document.getElementById(id);
+
+  // Close
+  el("settings-close")?.addEventListener("click", closeSettings);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeSettings();
+  });
+
+  // Tab switching
+  overlay.querySelectorAll("[data-settings-tab]").forEach(tab => {
+    tab.addEventListener("click", () => {
+      overlay.querySelectorAll(".settings-tab").forEach(t => t.classList.remove("active"));
+      overlay.querySelectorAll(".settings-section").forEach(s => s.classList.remove("active"));
+      tab.classList.add("active");
+      overlay.querySelector(`[data-settings-section="${tab.dataset.settingsTab}"]`)?.classList.add("active");
+      sfx.click();
+    });
+  });
+
+  // ── Display toggles ──
+  el("set-declutter")?.addEventListener("change", (e) => {
+    state.declutter = e.target.checked;
+    applyDeclutterMode();
+  });
+  el("set-compact")?.addEventListener("change", (e) => {
+    state.compact = e.target.checked;
+    applyDensityMode();
+  });
+  el("set-ultra-dark")?.addEventListener("change", (e) => {
+    _ultraDark = e.target.checked;
+    document.body.classList.toggle("ultra-dark", _ultraDark);
+  });
+  el("set-cinema")?.addEventListener("change", () => {
+    toggleCinemaMode();
+    _syncSettingsUI();
+  });
+  el("set-scanlines")?.addEventListener("change", (e) => {
+    _settingsPrefs.scanlines = e.target.checked;
+    const scanEl = document.getElementById("scanline-overlay");
+    if (scanEl) scanEl.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+
+  // ── FX ──
+  el("set-fx-mode")?.addEventListener("change", (e) => {
+    state.fxMode = e.target.value;
+    saveJson(STORAGE_KEYS.fxMode, state.fxMode);
+    applyFxMode(state.fxMode);
+    renderFxButtons();
+  });
+  el("set-fx-intensity")?.addEventListener("input", (e) => {
+    state.fxIntensity = Number(e.target.value);
+    el("set-fx-intensity-val").textContent = e.target.value;
+    applyFxIntensity();
+    if (elements.fxIntensity) elements.fxIntensity.value = e.target.value;
+  });
+  el("set-fx-glow")?.addEventListener("input", (e) => {
+    state.fxGlow = Number(e.target.value);
+    el("set-fx-glow-val").textContent = e.target.value;
+    applyGlow();
+    if (elements.fxGlow) elements.fxGlow.value = e.target.value;
+  });
+
+  // ── Globe tab ──
+  el("set-spin")?.addEventListener("change", (e) => {
+    state.spinning = e.target.checked;
+    elements.btnSpin?.classList.toggle("active", state.spinning);
+    state.spinning ? sfx.toggleOn() : sfx.toggleOff();
+  });
+  el("set-tilt")?.addEventListener("change", (e) => {
+    state.tiltMode = e.target.checked;
+    elements.btnTilt?.classList.toggle("active", state.tiltMode);
+    viewer.camera.flyTo({
+      destination: viewer.camera.positionWC,
+      orientation: { heading: viewer.camera.heading, pitch: state.tiltMode ? Cesium.Math.toRadians(-38) : Cesium.Math.toRadians(-90), roll: 0 },
+      duration: 0.8
+    });
+  });
+  el("set-globe-grid")?.addEventListener("change", () => {
+    toggleGlobeGrid();
+    _syncSettingsUI();
+  });
+  el("set-console-frame")?.addEventListener("change", (e) => {
+    _settingsPrefs.consoleFrame = e.target.checked;
+    const cf = document.getElementById("console-frame");
+    if (cf) cf.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+  el("set-compass")?.addEventListener("change", (e) => {
+    _settingsPrefs.compass = e.target.checked;
+    const cr = document.getElementById("compass-rose");
+    if (cr) cr.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+  el("set-reticle")?.addEventListener("change", (e) => {
+    _settingsPrefs.reticle = e.target.checked;
+    const re = document.getElementById("center-reticle");
+    if (re) re.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+  el("set-footer")?.addEventListener("change", (e) => {
+    _settingsPrefs.footer = e.target.checked;
+    const ft = document.getElementById("hud-bottom");
+    if (ft) ft.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+  el("set-summary-panel")?.addEventListener("change", (e) => {
+    _settingsPrefs.summaryPanel = e.target.checked;
+    const sp = document.getElementById("floating-summary");
+    if (sp) sp.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+
+  // ── Data tab ──
+  el("set-refresh-interval")?.addEventListener("input", (e) => {
+    state.refreshIntervalSec = Number(e.target.value);
+    el("set-refresh-interval-val").textContent = `${e.target.value}s`;
+    if (elements.refreshInterval) elements.refreshInterval.value = e.target.value;
+    if (elements.refreshIntervalVal) elements.refreshIntervalVal.textContent = `${state.refreshIntervalSec}s`;
+    scheduleRefresh();
+  });
+  el("set-news-toasts")?.addEventListener("change", (e) => {
+    _settingsPrefs.newsToasts = e.target.checked;
+    _saveSettingsPrefs();
+  });
+  el("set-news-autorotate")?.addEventListener("change", (e) => {
+    _settingsPrefs.newsAutoRotate = e.target.checked;
+    if (e.target.checked && state.newsOpen) startNewsCategoryRotation();
+    else stopNewsCategoryRotation();
+    _saveSettingsPrefs();
+  });
+
+  el("set-ais-save")?.addEventListener("click", () => {
+    const val = el("set-ais-endpoint")?.value?.trim();
+    if (val) { setConfiguredAisEndpoint(val); showToast("AIS endpoint saved", "info"); }
+  });
+  el("set-ais-clear")?.addEventListener("click", () => {
+    setConfiguredAisEndpoint("");
+    if (el("set-ais-endpoint")) el("set-ais-endpoint").value = "";
+    showToast("AIS endpoint cleared", "info");
+  });
+  el("set-ais-test")?.addEventListener("click", async () => {
+    showToast("Testing AIS endpoint…", "info");
+    const result = await testAisEndpoint();
+    showToast(typeof result === "string" ? result : "AIS test complete", "info");
+  });
+
+  el("set-save-bookmark")?.addEventListener("click", () => {
+    saveCurrentBookmark();
+    showToast("Bookmark saved", "info");
+  });
+  el("set-clear-bookmarks")?.addEventListener("click", () => {
+    state.bookmarks = state.bookmarks.filter(b => b.system);
+    saveJson(STORAGE_KEYS.bookmarks, state.bookmarks);
+    renderBookmarks();
+    showToast("Custom bookmarks cleared", "info");
+  });
+
+  // ── Audio tab ──
+  el("set-audio-enabled")?.addEventListener("change", (e) => {
+    setAudioEnabled(e.target.checked);
+    syncAudioIcon();
+  });
+  el("set-ambient")?.addEventListener("change", (e) => {
+    _settingsPrefs.ambientAudio = e.target.checked;
+    if (e.target.checked && isAudioEnabled()) sfx.startAmbient();
+    else sfx.stopAmbient();
+    _saveSettingsPrefs();
+  });
+  el("set-ui-sfx")?.addEventListener("change", (e) => {
+    _settingsPrefs.uiSfx = e.target.checked;
+    _saveSettingsPrefs();
+  });
+  el("set-notify-sfx")?.addEventListener("change", (e) => {
+    _settingsPrefs.notifySfx = e.target.checked;
+    _saveSettingsPrefs();
+  });
+
+  // ── Advanced tab ──
+  el("set-gpu-hints")?.addEventListener("change", (e) => {
+    _settingsPrefs.gpuHints = e.target.checked;
+    document.body.classList.toggle("no-gpu-hints", !e.target.checked);
+    _saveSettingsPrefs();
+  });
+  el("set-smooth-scroll")?.addEventListener("change", (e) => {
+    _settingsPrefs.smoothScroll = e.target.checked;
+    document.documentElement.style.scrollBehavior = e.target.checked ? "smooth" : "auto";
+    _saveSettingsPrefs();
+  });
+  el("set-save-layout")?.addEventListener("click", () => {
+    saveCurrentLayout();
+    showToast("Layout saved", "info");
+  });
+  el("set-clear-layouts")?.addEventListener("click", () => {
+    state.savedLayouts = [];
+    saveJson(UI_STORAGE_KEYS.layouts, state.savedLayouts);
+    renderSavedLayouts();
+    showToast("Layouts cleared", "info");
+  });
+  el("set-reset-panels")?.addEventListener("click", () => {
+    const fresh = createDefaultPanelState();
+    state.panelState = fresh;
+    savePanelState();
+    applyStoredPanelState();
+    showToast("Panel positions reset", "info");
+  });
+  el("set-reset-all")?.addEventListener("click", () => {
+    if (!confirm("Reset ALL settings to defaults? The page will reload.")) return;
+    Object.values(STORAGE_KEYS).forEach(k => { try { localStorage.removeItem(k); } catch { /* */ } });
+    Object.values(UI_STORAGE_KEYS).forEach(k => { try { localStorage.removeItem(k); } catch { /* */ } });
+    try { localStorage.removeItem("panopticon-earth-settings-prefs"); } catch { /* */ }
+    try { localStorage.removeItem("panopticon-earth-audio-enabled"); } catch { /* */ }
+    window.location.reload();
+  });
+}
+
+const _SETTINGS_PREFS_KEY = "panopticon-earth-settings-prefs";
+function _saveSettingsPrefs() {
+  try { localStorage.setItem(_SETTINGS_PREFS_KEY, JSON.stringify(_settingsPrefs)); } catch { /* */ }
+}
+function _loadSettingsPrefs() {
+  try {
+    const raw = localStorage.getItem(_SETTINGS_PREFS_KEY);
+    if (raw) Object.assign(_settingsPrefs, JSON.parse(raw));
+  } catch { /* */ }
+}
+_loadSettingsPrefs();
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PINCH-TO-ZOOM HINT — Shows once on mobile touch devices
 // ─────────────────────────────────────────────────────────────────────────────
 function showPinchHint() {
@@ -7008,15 +7410,21 @@ function showToast(message, type = "info") {
   const toast = document.createElement("div");
   toast.className = `event-toast toast-${type}`;
   const icon = type === "warning" ? "⚠" : "ℹ";
-  toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-text">${escapeHtml(message)}</span>`;
+  toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-text">${escapeHtml(message)}</span><button class="toast-close" type="button" title="Dismiss" aria-label="Dismiss">✕</button>`;
   toast.style.top = "60px";
   document.body.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add("toast-enter"));
-  setTimeout(() => {
+  let dismissed = false;
+  const dismiss = () => {
+    if (dismissed) return;
+    dismissed = true;
     toast.classList.remove("toast-enter");
     toast.classList.add("toast-exit");
     setTimeout(() => toast.remove(), 400);
-  }, 2500);
+  };
+  toast.querySelector(".toast-close").addEventListener("click", dismiss);
+  sfx.notify();
+  requestAnimationFrame(() => toast.classList.add("toast-enter"));
+  setTimeout(dismiss, 2500);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7025,6 +7433,7 @@ function showToast(message, type = "info") {
 const _toastQueue = [];
 
 function showEventToast(title, country) {
+  if (!_settingsPrefs.newsToasts) return;
   _toastQueue.push({ title, country });
   processToastQueue();
 }
@@ -7041,7 +7450,7 @@ function processToastQueue() {
   const toast = document.createElement("div");
   toast.className = "event-toast";
   const countryTag = country ? `<span class="toast-country">${country.toUpperCase()}</span>` : "";
-  toast.innerHTML = `<span class="toast-icon">⚡</span> <span class="toast-text">${escapeHtml(title.slice(0, 60))}${title.length > 60 ? "…" : ""}</span>${countryTag}`;
+  toast.innerHTML = `<span class="toast-icon">⚡</span> <span class="toast-text">${escapeHtml(title.slice(0, 60))}${title.length > 60 ? "…" : ""}</span>${countryTag}<button class="toast-close" type="button" title="Dismiss" aria-label="Dismiss">✕</button>`;
   document.body.appendChild(toast);
 
   // Stack offset
@@ -7049,19 +7458,25 @@ function processToastQueue() {
   toast.style.top = `${60 + idx * 56}px`;
   _activeToasts.push(toast);
 
-  requestAnimationFrame(() => toast.classList.add("toast-enter"));
-
-  setTimeout(() => {
+  let dismissed = false;
+  const dismissEventToast = () => {
+    if (dismissed) return;
+    dismissed = true;
     toast.classList.remove("toast-enter");
     toast.classList.add("toast-exit");
     setTimeout(() => {
       toast.remove();
       _activeToasts = _activeToasts.filter(t => t !== toast);
-      // Reposition remaining toasts
       _activeToasts.forEach((t, i) => { t.style.top = `${60 + i * 56}px`; });
-      processToastQueue(); // process queued toasts
+      processToastQueue();
     }, 400);
-  }, 3000);
+  };
+  toast.querySelector(".toast-close").addEventListener("click", dismissEventToast);
+
+  sfx.notify();
+  requestAnimationFrame(() => toast.classList.add("toast-enter"));
+
+  setTimeout(dismissEventToast, 3000);
 
   // Try to fill more slots
   if (_toastQueue.length && _activeToasts.length < MAX_TOASTS) {
@@ -7355,6 +7770,35 @@ initIdleAutoRotate();
 showPinchHint();
 initUtcClock();
 initScanlineOverlay();
+
+// Apply persisted settings prefs
+(function applyBootSettingsPrefs() {
+  if (!_settingsPrefs.scanlines) {
+    const sl = document.getElementById("scanline-overlay");
+    if (sl) sl.style.display = "none";
+  }
+  if (!_settingsPrefs.consoleFrame) {
+    const cf = document.getElementById("console-frame");
+    if (cf) cf.style.display = "none";
+  }
+  if (!_settingsPrefs.compass) {
+    const cr = document.getElementById("compass-rose");
+    if (cr) cr.style.display = "none";
+  }
+  if (!_settingsPrefs.reticle) {
+    const re = document.getElementById("center-reticle");
+    if (re) re.style.display = "none";
+  }
+  if (!_settingsPrefs.footer) {
+    const ft = document.getElementById("hud-bottom");
+    if (ft) ft.style.display = "none";
+  }
+  if (!_settingsPrefs.summaryPanel) {
+    const sp = document.getElementById("floating-summary");
+    if (sp) sp.style.display = "none";
+  }
+})();
+
 initCameraPositionHud();
 initArrowKeyNudge();
 initEventSparkline();
@@ -7518,9 +7962,18 @@ function toggleGlobeGrid() {
   }
 }
 
+function syncAudioIcon() {
+  const audioBtn = document.getElementById("btn-audio-toggle");
+  if (!audioBtn) return;
+  const on = isAudioEnabled();
+  audioBtn.textContent = on ? "🔊" : "🔇";
+  audioBtn.classList.toggle("muted", !on);
+}
+
 function toggleAudioMute() {
   const enabled = isAudioEnabled();
   setAudioEnabled(!enabled);
+  syncAudioIcon();
   showToast(enabled ? "Audio muted 🔇" : "Audio enabled 🔊", "info");
 }
 

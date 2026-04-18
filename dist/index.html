@@ -33,8 +33,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-DJ012W08.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-b-g7z9at.css">
+  <script type="module" crossorigin src="./assets/index-CgibCFHf.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-D39LC0Ys.css">
 </head>
 <body>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
@@ -241,6 +241,7 @@
         <button id="btn-home" class="hud-action" type="button">HOME</button>
         <button id="btn-tilt" class="hud-action" type="button">TILT</button>
         <button id="btn-spin" class="hud-action" type="button">SPIN</button>
+        <button id="btn-settings" class="hud-action" type="button" title="Settings">⚙</button>
       </div>
     </header>
 
@@ -249,6 +250,7 @@
       <button id="btn-mobile-controls" class="hud-action" type="button">CONTROL</button>
       <button id="btn-mobile-intel" class="hud-action" type="button">INTEL</button>
       <button id="btn-mobile-signals" class="hud-action" type="button">SIGNALS</button>
+      <button id="btn-mobile-settings" class="hud-action" type="button">⚙</button>
     </div>
 
     <div id="mobile-backdrop" class="mobile-backdrop hidden"></div>
@@ -664,14 +666,269 @@
           <div class="shortcut-row"><kbd>Space</kbd><span>Pause / resume</span></div>
           <div class="shortcut-row"><kbd>/</kbd><span>Open console</span></div>
           <div class="shortcut-row"><kbd>Esc</kbd><span>Close panels</span></div>
+          <div class="shortcut-row"><kbd>,</kbd><span>Open settings</span></div>
           <div class="shortcut-row"><kbd>?</kbd><span>This overlay</span></div>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Settings Panel -->
+  <div id="settings-overlay" class="settings-overlay hidden" role="dialog" aria-label="Settings">
+    <div class="settings-panel">
+      <div class="settings-header">
+        <span class="settings-title">⚙ SETTINGS</span>
+        <button id="settings-close" class="settings-close-btn" type="button" title="Close settings" aria-label="Close">✕</button>
+      </div>
+
+      <nav class="settings-tabs" role="tablist">
+        <button class="settings-tab active" data-settings-tab="display" role="tab" type="button">Display</button>
+        <button class="settings-tab" data-settings-tab="globe" role="tab" type="button">Globe</button>
+        <button class="settings-tab" data-settings-tab="data" role="tab" type="button">Data</button>
+        <button class="settings-tab" data-settings-tab="audio" role="tab" type="button">Audio</button>
+        <button class="settings-tab" data-settings-tab="advanced" role="tab" type="button">Advanced</button>
+      </nav>
+
+      <div class="settings-body">
+        <!-- Display Tab -->
+        <section class="settings-section active" data-settings-section="display">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Theme &amp; Appearance</h3>
+            <label class="settings-toggle">
+              <span>Focus Mode (Declutter)</span>
+              <input type="checkbox" id="set-declutter" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Compact Density</span>
+              <input type="checkbox" id="set-compact" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Ultra-Dark Theme</span>
+              <input type="checkbox" id="set-ultra-dark" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Cinema Mode (Letterbox)</span>
+              <input type="checkbox" id="set-cinema" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Scanline Overlay</span>
+              <input type="checkbox" id="set-scanlines" checked />
+              <span class="settings-switch"></span>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Visual Effects</h3>
+            <div class="settings-select-row">
+              <span>FX Mode</span>
+              <select id="set-fx-mode" class="settings-select">
+                <option value="normal">Normal</option>
+                <option value="nightvision">NV</option>
+                <option value="thermal">Thermal</option>
+                <option value="crt">CRT</option>
+                <option value="warroom">War Room</option>
+              </select>
+            </div>
+            <div class="settings-slider-row">
+              <span>FX Intensity</span>
+              <input type="range" id="set-fx-intensity" min="0" max="100" value="58" class="settings-range" />
+              <span class="settings-range-val" id="set-fx-intensity-val">58</span>
+            </div>
+            <div class="settings-slider-row">
+              <span>Glow Intensity</span>
+              <input type="range" id="set-fx-glow" min="0" max="100" value="30" class="settings-range" />
+              <span class="settings-range-val" id="set-fx-glow-val">30</span>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Basemap</h3>
+            <div id="set-basemap-row" class="settings-basemap-row"></div>
+          </div>
+        </section>
+
+        <!-- Globe Tab -->
+        <section class="settings-section" data-settings-section="globe">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Camera &amp; Motion</h3>
+            <label class="settings-toggle">
+              <span>Auto-Rotate (Spin)</span>
+              <input type="checkbox" id="set-spin" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Tilt View</span>
+              <input type="checkbox" id="set-tilt" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Globe Grid</span>
+              <input type="checkbox" id="set-globe-grid" />
+              <span class="settings-switch"></span>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Layer Visibility</h3>
+            <div id="set-layers-list" class="settings-layers-list"></div>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">HUD Elements</h3>
+            <label class="settings-toggle">
+              <span>Console Frame</span>
+              <input type="checkbox" id="set-console-frame" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Compass Rose</span>
+              <input type="checkbox" id="set-compass" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Center Reticle</span>
+              <input type="checkbox" id="set-reticle" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Footer Status Bar</span>
+              <input type="checkbox" id="set-footer" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Floating Summary</span>
+              <input type="checkbox" id="set-summary-panel" checked />
+              <span class="settings-switch"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Data Tab -->
+        <section class="settings-section" data-settings-section="data">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Feed Settings</h3>
+            <div class="settings-slider-row">
+              <span>Refresh Interval</span>
+              <input type="range" id="set-refresh-interval" min="30" max="300" step="30" value="90" class="settings-range" />
+              <span class="settings-range-val" id="set-refresh-interval-val">90s</span>
+            </div>
+            <label class="settings-toggle">
+              <span>News Toasts</span>
+              <input type="checkbox" id="set-news-toasts" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Auto-Cycle News Categories</span>
+              <input type="checkbox" id="set-news-autorotate" checked />
+              <span class="settings-switch"></span>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">AIS Endpoint</h3>
+            <input type="text" id="set-ais-endpoint" class="settings-text-input" placeholder="wss://your-ais-endpoint" autocomplete="off" />
+            <div class="settings-btn-row">
+              <button id="set-ais-save" class="settings-btn" type="button">Save</button>
+              <button id="set-ais-clear" class="settings-btn secondary" type="button">Clear</button>
+              <button id="set-ais-test" class="settings-btn secondary" type="button">Test</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Bookmarks</h3>
+            <div class="settings-btn-row">
+              <button id="set-save-bookmark" class="settings-btn" type="button">Save Current View</button>
+              <button id="set-clear-bookmarks" class="settings-btn secondary" type="button">Clear Custom</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Audio Tab -->
+        <section class="settings-section" data-settings-section="audio">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Sound</h3>
+            <label class="settings-toggle">
+              <span>Enable Audio</span>
+              <input type="checkbox" id="set-audio-enabled" />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Ambient Background</span>
+              <input type="checkbox" id="set-ambient" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>UI Sound Effects</span>
+              <input type="checkbox" id="set-ui-sfx" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Notification Sounds</span>
+              <input type="checkbox" id="set-notify-sfx" checked />
+              <span class="settings-switch"></span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Advanced Tab -->
+        <section class="settings-section" data-settings-section="advanced">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Performance</h3>
+            <label class="settings-toggle">
+              <span>GPU Compositing Hints</span>
+              <input type="checkbox" id="set-gpu-hints" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Smooth Scroll</span>
+              <input type="checkbox" id="set-smooth-scroll" checked />
+              <span class="settings-switch"></span>
+            </label>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Layouts</h3>
+            <div class="settings-btn-row">
+              <button id="set-save-layout" class="settings-btn" type="button">Save Current Layout</button>
+              <button id="set-clear-layouts" class="settings-btn secondary" type="button">Clear Layouts</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">Data Management</h3>
+            <div class="settings-btn-row">
+              <button id="set-reset-panels" class="settings-btn secondary" type="button">Reset Panel Positions</button>
+              <button id="set-reset-all" class="settings-btn danger" type="button">Reset All Settings</button>
+            </div>
+            <p class="settings-hint">Reset All will clear all saved preferences and reload the page.</p>
+          </div>
+
+          <div class="settings-group">
+            <h3 class="settings-group-title">About</h3>
+            <p class="settings-about">
+              <strong>God's Eye — Panopticon Earth v2.0</strong><br/>
+              Real-time 3D global intelligence dashboard<br/>
+              Built with CesiumJS · Vanilla JS · Vite<br/>
+              <a href="https://github.com/CaptainFredric/God-s-Eye" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+            </p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <!-- Audio toggle -->
   <button id="btn-audio-toggle" class="audio-toggle" type="button" title="Toggle audio">🔊</button>
+
+  <!-- Support widget -->
+  <a id="support-btn" class="support-btn" href="https://buymeacoffee.com/captainfredric" target="_blank" rel="noopener noreferrer" title="Support this project">
+    <span class="support-icon">☕</span>
+    <span class="support-label">Buy me a coffee</span>
+  </a>
 
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
 </body>
