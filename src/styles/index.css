@@ -4922,18 +4922,6 @@ body.compact-ui .control-group + .control-group {
     padding: 10px 12px;
   }
 
-  /* Toast positioning: avoid overlap with mobile drawers */
-  .toast-container {
-    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
-    left: 8px !important;
-    right: 8px !important;
-    max-width: 100% !important;
-  }
-  .toast {
-    font-size: 0.6rem;
-    padding: 8px 10px;
-  }
-
   /* Intel sheet: full-width on phone */
   .intel-sheet-panel {
     width: calc(100vw - 16px) !important;
@@ -6014,6 +6002,44 @@ body.surgical-zoom .center-reticle { opacity: 0.8; }
   text-decoration: underline;
 }
 
+/* Keyboard shortcuts list inside settings */
+.settings-shortcuts-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+}
+.settings-shortcuts-list > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-shortcuts-list dt {
+  flex-shrink: 0;
+}
+.settings-shortcuts-list dd {
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-shortcuts-list kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.58rem;
+  color: rgba(0, 212, 255, 0.8);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
 /* Settings panel responsive */
 @media (max-width: 600px) {
   .settings-panel {
@@ -6872,28 +6898,36 @@ body.surgical-zoom .center-reticle { opacity: 0.8; }
   }
 }
 
-/* ── Event Toast Notifications ───────────────────────────────────────── */
-.event-toast {
+/* ── Toast Container + Notifications ─────────────────────────────────── */
+.toast-container {
   position: fixed;
   top: 60px;
   right: 16px;
   z-index: 9999;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+
+.event-toast {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(10, 15, 28, 0.92), rgba(20, 28, 48, 0.92));
-  border: 1px solid rgba(0, 240, 255, 0.25);
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(10, 15, 28, 0.95), rgba(20, 28, 48, 0.95));
+  border: 1px solid rgba(0, 240, 255, 0.22);
   border-left: 3px solid var(--accent-cyan, #00f0ff);
   border-radius: 4px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 240, 255, 0.08);
-  max-width: 340px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 12px rgba(0, 240, 255, 0.06);
   pointer-events: auto;
   opacity: 0;
-  transform: translateX(60px);
-  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), top 0.3s ease;
+  transform: translateX(32px);
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform, opacity;
 }
 .event-toast.toast-enter {
@@ -6902,67 +6936,95 @@ body.surgical-zoom .center-reticle { opacity: 0.8; }
 }
 .event-toast.toast-exit {
   opacity: 0;
-  transform: translateX(60px);
+  transform: translateX(40px);
 }
+
+/* Toast type variants */
+.event-toast.toast-success {
+  border-left-color: #00e676;
+  border-color: rgba(0, 230, 118, 0.22);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 12px rgba(0, 230, 118, 0.08);
+}
+.event-toast.toast-error {
+  border-left-color: #ff4d6d;
+  border-color: rgba(255, 77, 109, 0.22);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 12px rgba(255, 77, 109, 0.1);
+}
+.event-toast.toast-warning {
+  border-left-color: #ffbe5c;
+  border-color: rgba(255, 190, 92, 0.22);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45), 0 0 12px rgba(255, 190, 92, 0.08);
+}
+
 .toast-icon {
-  font-size: 1rem;
+  font-size: 0.9rem;
   flex-shrink: 0;
+  line-height: 1;
 }
 .toast-text {
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.85);
+  flex: 1;
+  font-size: 0.67rem;
+  color: rgba(255, 255, 255, 0.88);
   letter-spacing: 0.02em;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .toast-country {
-  font-size: 0.5rem;
+  font-size: 0.48rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   padding: 2px 5px;
   border-radius: 3px;
-  background: rgba(0, 240, 255, 0.15);
+  background: rgba(0, 240, 255, 0.12);
   color: var(--accent-cyan, #00f0ff);
-  border: 1px solid rgba(0, 240, 255, 0.2);
+  border: 1px solid rgba(0, 240, 255, 0.18);
   flex-shrink: 0;
+  white-space: nowrap;
 }
 .toast-close {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 3px;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.5rem;
   cursor: pointer;
   pointer-events: auto;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   padding: 0;
   line-height: 1;
-  margin-left: 4px;
+  margin-left: 2px;
 }
 .toast-close:hover {
-  background: rgba(255, 77, 109, 0.2);
+  background: rgba(255, 77, 109, 0.18);
   color: #ff4d6d;
   border-color: rgba(255, 77, 109, 0.3);
 }
-.event-toast {
-  pointer-events: auto;
-}
-@media (max-width: 420px) {
-  .event-toast {
+
+@media (max-width: 520px) {
+  .toast-container {
+    top: auto;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     right: 8px;
     left: 8px;
-    top: 42px;
-    max-width: none;
+    width: auto;
+  }
+  .event-toast {
+    transform: translateY(16px);
+  }
+  .event-toast.toast-exit {
+    transform: translateY(16px);
   }
 }
+
 
 /* ── Scanline Overlay ────────────────────────────────────────────────── */
 .scanline-overlay {

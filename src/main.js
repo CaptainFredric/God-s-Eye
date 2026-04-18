@@ -4002,7 +4002,7 @@ function initTerminalCli() {
 
     switch (cmd) {
       case "/help":
-        appendOutput("Commands: /focus <region> · /mode <fx> · /alert <level> · /scan · /warroom · /normal · /stats · /events · /country <name> · /refresh · /screenshot · /theme · /fullscreen · /uptime · /goto <lat,lng> · /layers · /fly <dest> · /perf · /reset · /search <term> · /time · /opacity <0-1> · /summary · /bookmark <name> · /measure · /export · /clear · /help", "cmd-info");
+        appendOutput("Commands: /focus <region> · /mode <fx> · /alert <level> · /scan · /warroom · /normal · /stats · /events · /country <name> · /refresh · /screenshot · /theme · /fullscreen · /uptime · /goto <lat,lng> · /layers · /layer toggle <id> · /fly <dest> · /perf · /reset · /search <term> · /time · /opacity <0-1> · /summary · /bookmark <name> · /measure · /export · /clear · /settings · /locate · /toast <msg> · /spin · /version · /help", "cmd-info");
         break;
 
       case "/focus": {
@@ -4330,12 +4330,68 @@ function initTerminalCli() {
         break;
       }
 
+      case "/settings":
+        openSettings();
+        toggleCli(false);
+        break;
+
+      case "/locate": {
+        const cam = viewer.camera.positionCartographic;
+        const latD = Cesium.Math.toDegrees(cam.latitude).toFixed(4);
+        const lngD = Cesium.Math.toDegrees(cam.longitude).toFixed(4);
+        const altKm = (cam.height / 1000).toFixed(1);
+        const hdgD = Cesium.Math.toDegrees(viewer.camera.heading).toFixed(1);
+        appendOutput(`Camera: ${latD}°N  ${lngD}°E  Alt: ${altKm} km  Hdg: ${hdgD}°`, "cmd-ok");
+        break;
+      }
+
+      case "/toast": {
+        const toastTypes = ["success", "error", "warning", "info"];
+        const tParts = arg.split(/\s+/);
+        const lastToken = tParts[tParts.length - 1];
+        const toastType = toastTypes.includes(lastToken) ? tParts.pop() && lastToken : "info";
+        const toastMsg = tParts.join(" ") || "Test notification";
+        showToast(toastMsg, toastType);
+        appendOutput(`Sent ${toastType} toast`, "cmd-ok");
+        break;
+      }
+
+      case "/layer": {
+        const [layerSub, layerId] = arg.split(/\s+/);
+        if (layerSub === "toggle" && layerId) {
+          if (state.layers[layerId] !== undefined) {
+            state.layers[layerId] = !state.layers[layerId];
+            saveJson(STORAGE_KEYS.layers, state.layers);
+            renderLayerToggles();
+            renderLegend();
+            refreshEntityVisibility();
+            appendOutput(`Layer "${layerId}" → ${state.layers[layerId] ? "ON" : "OFF"}`, "cmd-ok");
+          } else {
+            appendOutput(`Unknown layer: ${layerId}. Available: ${Object.keys(state.layers).join(", ")}`, "cmd-err");
+          }
+        } else {
+          const layerList = Object.entries(state.layers).map(([id, v]) => `  ${v ? "●" : "○"} ${id}`).join("\n");
+          appendOutput("Layers (use /layer toggle <id>):\n" + layerList, "cmd-info");
+        }
+        break;
+      }
+
+      case "/spin":
+        state.spinning = !state.spinning;
+        elements.btnSpin?.classList.toggle("active", state.spinning);
+        appendOutput(`Globe spin: ${state.spinning ? "ON" : "OFF"}`, "cmd-ok");
+        break;
+
+      case "/version":
+        appendOutput(`Panopticon Earth v2.0 — God's Eye  (build ${new Date().getFullYear()})`, "cmd-info");
+        break;
+
       default:
         appendOutput(`Unknown command: ${cmd}. Type /help for available commands.`, "cmd-err");
     }
   }
 
-  const CLI_COMMANDS = ["/help", "/focus", "/mode", "/alert", "/scan", "/warroom", "/normal", "/stats", "/events", "/country", "/refresh", "/screenshot", "/theme", "/fullscreen", "/uptime", "/goto", "/layers", "/fly", "/perf", "/reset", "/search", "/time", "/opacity", "/summary", "/bookmark", "/measure", "/export", "/clear"];
+  const CLI_COMMANDS = ["/help", "/focus", "/mode", "/alert", "/scan", "/warroom", "/normal", "/stats", "/events", "/country", "/refresh", "/screenshot", "/theme", "/fullscreen", "/uptime", "/goto", "/layers", "/layer", "/fly", "/perf", "/reset", "/search", "/time", "/opacity", "/summary", "/bookmark", "/measure", "/export", "/clear", "/settings", "/locate", "/toast", "/spin", "/version"];
 
   cliInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -6788,7 +6844,10 @@ const _settingsPrefs = {
   compass: true,
   reticle: true,
   footer: true,
-  summaryPanel: true
+  summaryPanel: true,
+  classificationBar: true,
+  fpsCounter: true,
+  uptimeCounter: true,
 };
 
 // Wrap sfx calls so UI/notify prefs are respected
@@ -6880,6 +6939,9 @@ function _syncSettingsUI() {
   _setCheck("set-reticle", _settingsPrefs.reticle);
   _setCheck("set-footer", _settingsPrefs.footer);
   _setCheck("set-summary-panel", _settingsPrefs.summaryPanel);
+  _setCheck("set-classbar", _settingsPrefs.classificationBar);
+  _setCheck("set-fps-counter", _settingsPrefs.fpsCounter);
+  _setCheck("set-uptime-counter", _settingsPrefs.uptimeCounter);
 
   // Layers
   const layersList = el("set-layers-list");
@@ -7121,6 +7183,24 @@ function _wireSettingsPanel(overlay) {
     document.documentElement.style.scrollBehavior = e.target.checked ? "smooth" : "auto";
     _saveSettingsPrefs();
   });
+  el("set-classbar")?.addEventListener("change", (e) => {
+    _settingsPrefs.classificationBar = e.target.checked;
+    const bar = document.getElementById("classification-bar");
+    if (bar) bar.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+  el("set-fps-counter")?.addEventListener("change", (e) => {
+    _settingsPrefs.fpsCounter = e.target.checked;
+    const fps = document.getElementById("fps-display");
+    if (fps) fps.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
+  el("set-uptime-counter")?.addEventListener("change", (e) => {
+    _settingsPrefs.uptimeCounter = e.target.checked;
+    const uptime = document.getElementById("session-uptime-wrap");
+    if (uptime) uptime.style.display = e.target.checked ? "" : "none";
+    _saveSettingsPrefs();
+  });
   el("set-save-layout")?.addEventListener("click", () => {
     saveCurrentLayout();
     showToast("Layout saved", "info");
@@ -7145,6 +7225,29 @@ function _wireSettingsPanel(overlay) {
     try { localStorage.removeItem("panopticon-earth-settings-prefs"); } catch { /* */ }
     try { localStorage.removeItem("panopticon-earth-audio-enabled"); } catch { /* */ }
     window.location.reload();
+  });
+  el("set-export-config")?.addEventListener("click", () => {
+    const config = {
+      exportedAt: new Date().toISOString(),
+      settingsPrefs: { ..._settingsPrefs },
+      state: {
+        fxMode: state.fxMode,
+        basemapId: state.basemapId,
+        declutter: state.declutter,
+        compact: state.compact,
+        refreshIntervalSec: state.refreshIntervalSec,
+        fxIntensity: state.fxIntensity,
+        fxGlow: state.fxGlow,
+        layers: { ...state.layers },
+      },
+    };
+    const json = JSON.stringify(config, null, 2);
+    navigator.clipboard.writeText(json).then(() => {
+      showToast("Settings exported to clipboard", "success");
+    }).catch(() => {
+      showToast("Clipboard unavailable — see console", "warning");
+      console.log("[Settings Export]\n" + json);
+    });
   });
 }
 
@@ -7404,27 +7507,43 @@ function animateThroughputBars() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GENERIC TOAST — brief UI feedback messages
+// TOAST SYSTEM — all notifications routed through a single container
 // ─────────────────────────────────────────────────────────────────────────────
+function _getToastContainer() {
+  let c = document.getElementById("toast-container");
+  if (!c) {
+    c = document.createElement("div");
+    c.id = "toast-container";
+    c.className = "toast-container";
+    c.setAttribute("aria-live", "polite");
+    document.body.appendChild(c);
+  }
+  return c;
+}
+
 function showToast(message, type = "info") {
   const toast = document.createElement("div");
   toast.className = `event-toast toast-${type}`;
-  const icon = type === "warning" ? "⚠" : "ℹ";
-  toast.innerHTML = `<span class="toast-icon">${icon}</span> <span class="toast-text">${escapeHtml(message)}</span><button class="toast-close" type="button" title="Dismiss" aria-label="Dismiss">✕</button>`;
-  toast.style.top = "60px";
-  document.body.appendChild(toast);
+  const icon = type === "success" ? "✓"
+    : type === "error"   ? "✗"
+    : type === "warning" ? "⚠"
+    : "ℹ";
+  toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${escapeHtml(message)}</span><button class="toast-close" type="button" title="Dismiss" aria-label="Dismiss">✕</button>`;
+  _getToastContainer().appendChild(toast);
   let dismissed = false;
   const dismiss = () => {
     if (dismissed) return;
     dismissed = true;
     toast.classList.remove("toast-enter");
     toast.classList.add("toast-exit");
-    setTimeout(() => toast.remove(), 400);
+    setTimeout(() => toast.remove(), 350);
   };
   toast.querySelector(".toast-close").addEventListener("click", dismiss);
-  sfx.notify();
+  if (type === "success") sfx.success?.();
+  else if (type === "error") sfx.alert?.();
+  else sfx.notify();
   requestAnimationFrame(() => toast.classList.add("toast-enter"));
-  setTimeout(dismiss, 2500);
+  setTimeout(dismiss, type === "error" ? 4000 : 2800);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7443,19 +7562,15 @@ const MAX_TOASTS = 3;
 
 function processToastQueue() {
   if (!_toastQueue.length) return;
-  if (_activeToasts.length >= MAX_TOASTS) return; // wait for a slot
+  if (_activeToasts.length >= MAX_TOASTS) return;
 
   const { title, country } = _toastQueue.shift();
 
   const toast = document.createElement("div");
   toast.className = "event-toast";
   const countryTag = country ? `<span class="toast-country">${country.toUpperCase()}</span>` : "";
-  toast.innerHTML = `<span class="toast-icon">⚡</span> <span class="toast-text">${escapeHtml(title.slice(0, 60))}${title.length > 60 ? "…" : ""}</span>${countryTag}<button class="toast-close" type="button" title="Dismiss" aria-label="Dismiss">✕</button>`;
-  document.body.appendChild(toast);
-
-  // Stack offset
-  const idx = _activeToasts.length;
-  toast.style.top = `${60 + idx * 56}px`;
+  toast.innerHTML = `<span class="toast-icon">⚡</span><span class="toast-text">${escapeHtml(title.slice(0, 68))}${title.length > 68 ? "…" : ""}</span>${countryTag}<button class="toast-close" type="button" title="Dismiss" aria-label="Dismiss">✕</button>`;
+  _getToastContainer().appendChild(toast);
   _activeToasts.push(toast);
 
   let dismissed = false;
@@ -7467,22 +7582,20 @@ function processToastQueue() {
     setTimeout(() => {
       toast.remove();
       _activeToasts = _activeToasts.filter(t => t !== toast);
-      _activeToasts.forEach((t, i) => { t.style.top = `${60 + i * 56}px`; });
       processToastQueue();
-    }, 400);
+    }, 350);
   };
   toast.querySelector(".toast-close").addEventListener("click", dismissEventToast);
 
   sfx.notify();
   requestAnimationFrame(() => toast.classList.add("toast-enter"));
+  setTimeout(dismissEventToast, 3200);
 
-  setTimeout(dismissEventToast, 3000);
-
-  // Try to fill more slots
   if (_toastQueue.length && _activeToasts.length < MAX_TOASTS) {
-    setTimeout(() => processToastQueue(), 200);
+    setTimeout(() => processToastQueue(), 180);
   }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SESSION STATS — track and display operational session metrics
@@ -7796,6 +7909,18 @@ initScanlineOverlay();
   if (!_settingsPrefs.summaryPanel) {
     const sp = document.getElementById("floating-summary");
     if (sp) sp.style.display = "none";
+  }
+  if (!_settingsPrefs.classificationBar) {
+    const bar = document.getElementById("classification-bar");
+    if (bar) bar.style.display = "none";
+  }
+  if (!_settingsPrefs.fpsCounter) {
+    const fps = document.getElementById("fps-display");
+    if (fps) fps.style.display = "none";
+  }
+  if (!_settingsPrefs.uptimeCounter) {
+    const uptime = document.getElementById("session-uptime-wrap");
+    if (uptime) uptime.style.display = "none";
   }
 })();
 

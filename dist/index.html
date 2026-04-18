@@ -33,8 +33,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-CgibCFHf.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-D39LC0Ys.css">
+  <script type="module" crossorigin src="./assets/index-DQo7R2iP.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-bzYfu5Kj.css">
 </head>
 <body>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
@@ -803,8 +803,21 @@
               <span>Floating Summary</span>
               <input type="checkbox" id="set-summary-panel" checked />
               <span class="settings-switch"></span>
+            </label>            <label class="settings-toggle">
+              <span>Classification Banner</span>
+              <input type="checkbox" id="set-classbar" checked />
+              <span class="settings-switch"></span>
             </label>
-          </div>
+            <label class="settings-toggle">
+              <span>FPS Counter</span>
+              <input type="checkbox" id="set-fps-counter" checked />
+              <span class="settings-switch"></span>
+            </label>
+            <label class="settings-toggle">
+              <span>Session Uptime Counter</span>
+              <input type="checkbox" id="set-uptime-counter" checked />
+              <span class="settings-switch"></span>
+            </label>          </div>
         </section>
 
         <!-- Data Tab -->
@@ -908,6 +921,20 @@
           </div>
 
           <div class="settings-group">
+            <h3 class="settings-group-title">Keyboard Shortcuts</h3>
+            <dl class="settings-shortcuts-list">
+              <div><dt><kbd>,</kbd></dt><dd>Open Settings</dd></div>
+              <div><dt><kbd>?</kbd></dt><dd>Shortcuts overlay</dd></div>
+              <div><dt><kbd>`</kbd></dt><dd>Toggle terminal</dd></div>
+              <div><dt><kbd>F</kbd></dt><dd>Fullscreen</dd></div>
+              <div><dt><kbd>N</kbd></dt><dd>News briefing</dd></div>
+              <div><dt><kbd>Space</kbd></dt><dd>Toggle globe spin</dd></div>
+              <div><dt><kbd>+</kbd> / <kbd>−</kbd></dt><dd>Zoom in / out</dd></div>
+              <div><dt><kbd>Esc</kbd></dt><dd>Close overlays</dd></div>
+            </dl>
+          </div>
+
+          <div class="settings-group">
             <h3 class="settings-group-title">About</h3>
             <p class="settings-about">
               <strong>God's Eye — Panopticon Earth v2.0</strong><br/>
@@ -915,11 +942,17 @@
               Built with CesiumJS · Vanilla JS · Vite<br/>
               <a href="https://github.com/CaptainFredric/God-s-Eye" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
             </p>
+            <div class="settings-btn-row" style="margin-top:10px">
+              <button id="set-export-config" class="settings-btn secondary" type="button">Export Settings JSON</button>
+            </div>
           </div>
         </section>
       </div>
     </div>
   </div>
+
+  <!-- Toast notification container -->
+  <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
   <!-- Audio toggle -->
   <button id="btn-audio-toggle" class="audio-toggle" type="button" title="Toggle audio">🔊</button>
