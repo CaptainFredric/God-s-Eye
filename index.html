@@ -33,6 +33,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
 </head>
 <body>
+  <a href="#cesiumContainer" class="skip-link">Skip to map</a>
+  <noscript>
+    <div class="noscript-warning">This application requires JavaScript. Please enable JavaScript to use God&#39;s Eye.</div>
+  </noscript>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
   <div id="boot-overlay" class="boot-overlay" aria-hidden="true">
     <div class="boot-shutter boot-shutter-top"></div>
@@ -133,6 +137,7 @@
     <div class="loc-meta" id="loc-meta"></div>
   </div>
 
+  <main id="main-content" role="main">
   <div id="app">
     <div id="classification-bar" class="classification-bar" aria-hidden="true">UNCLASSIFIED // OPEN SOURCE INTELLIGENCE // PANOPTICON-EARTH v2.0 // ALL FEEDS ACTIVE</div>
     <div id="cesiumContainer"></div>
@@ -575,6 +580,7 @@
     <canvas id="ambient-particles" class="ambient-particles"></canvas>
 
   </div><!-- /#app -->
+  </main>
 
   <!-- ── Live News Briefing ─────────────────────────────────────────────── -->
   <aside id="news-briefing" class="news-briefing glass-panel hidden" aria-label="Live News Briefing">
