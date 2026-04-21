@@ -3256,6 +3256,17 @@ body.compact-ui .control-group + .control-group {
     display: none;
   }
 
+  /* Prevent background scrolling when mobile drawers or intel sheet are open */
+  body.mobile-drawer-open,
+  body.intel-sheet-open {
+    overflow: hidden;
+  }
+
+  /* Avoid restored panels being hidden under the fixed header on small screens */
+  .draggable-panel {
+    scroll-margin-top: calc(84px + env(safe-area-inset-top, 0px));
+  }
+
   #panel-layers,
   #panel-right,
   .intel-sheet {

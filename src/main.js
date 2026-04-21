@@ -3951,7 +3951,7 @@ function initTerminalCli() {
   function toggleCli(show) {
     cliVisible = typeof show === "boolean" ? show : !cliVisible;
     cliWrap.classList.toggle("hidden", !cliVisible);
-    if (cliVisible) { sfx.panelOpen(); cliInput.focus(); } else { sfx.panelClose(); }
+    if (cliVisible) { sfx.panelOpen(); cliInput.focus?.({ preventScroll: true }); } else { sfx.panelClose(); }
   }
 
   // Backtick (`) or Ctrl+/ toggles the terminal
@@ -4485,7 +4485,7 @@ function initDraggablePanels() {
         if (window.innerWidth <= 980) {
           if (panel.id === "panel-layers") openMobileDrawer("layers");
           else if (panel.id === "panel-right") openMobileDrawer("controls");
-          else panel.scrollIntoView({ behavior: "smooth", block: "start" });
+          else panel.scrollIntoView({ behavior: "smooth", block: "center" });
         }
         refreshRestoreStrip();
       });
@@ -5687,7 +5687,7 @@ function registerEvents() {
   window.addEventListener("keydown", event => {
     const target = event.target;
     if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-    if (event.key === "/")                { event.preventDefault(); elements.searchInput.focus(); elements.searchInput.select(); return; }
+    if (event.key === "/")                { event.preventDefault(); elements.searchInput.focus?.({ preventScroll: true }); elements.searchInput.select(); return; }
     if (event.key.toLowerCase() === "f") { state.declutter = !state.declutter; applyDeclutterMode(); return; }
     if (event.key.toLowerCase() === "d") { state.compact   = !state.compact;   applyDensityMode();   return; }
     if (event.key.toLowerCase() === "r") { refreshLiveFeeds(); return; }
@@ -6022,11 +6022,11 @@ function renderNewsCards(articles) {
       if (event.key === "ArrowDown") {
         event.preventDefault();
         const next = card.nextElementSibling;
-        if (next instanceof HTMLElement) next.focus();
+        if (next instanceof HTMLElement) next.focus?.({ preventScroll: true });
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         const prev = card.previousElementSibling;
-        if (prev instanceof HTMLElement) prev.focus();
+        if (prev instanceof HTMLElement) prev.focus?.({ preventScroll: true });
       } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         card.click();
