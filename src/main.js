@@ -800,6 +800,9 @@ async function nominatimFetch(url) {
   });
 }
 
+// Use open imagery (OpenStreetMap) to avoid Cesium Ion token requirement in sandboxed preview
+Cesium.Ion.defaultAccessToken = "";
+
 const viewer = new Cesium.Viewer("cesiumContainer", {
   animation:            false,
   timeline:             false,
@@ -813,8 +816,20 @@ const viewer = new Cesium.Viewer("cesiumContainer", {
   selectionIndicator:   false,
   requestRenderMode:    false,
   shouldAnimate:        false,
-  terrain:              undefined
+  terrain:              undefined,
+  baseLayer:            false   // disable default Ion WorldImagery; add OSM manually below
 });
+// Manually add an OSM imagery layer (no Ion token required)
+try {
+  viewer.imageryLayers.removeAll();
+  viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+    url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+    credit: "© OpenStreetMap contributors",
+    maximumLevel: 19
+  }));
+} catch (err) {
+  console.warn("OSM imagery init failed:", err);
+}
 
 const postStages = {
   blackAndWhite: Cesium.PostProcessStageLibrary.createBlackAndWhiteStage(),
@@ -905,6 +920,7 @@ initDraggablePanels();
 ensureMobilePanelVisibility();
 initPingCanvas();
 initCinematicUi();
+initHeaderToggle();
 viewer.scene.requestRender();
 
 function initializeNarrativeState() {
@@ -3938,6 +3954,46 @@ function initCinematicUi() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// HEADER COLLAPSE TOGGLE
+// ─────────────────────────────────────────────────────────────────────────────
+function initHeaderToggle() {
+  const btn    = document.getElementById("header-toggle-btn");
+  const hudTop = document.getElementById("hud-top");
+  if (!btn || !hudTop) return;
+
+  const STORAGE_KEY_HDR = "panopticon-hdr-collapsed";
+  let collapsed = localStorage.getItem(STORAGE_KEY_HDR) === "1";
+
+  function apply(animate) {
+    document.body.classList.toggle("header-collapsed", collapsed);
+    positionBtn();
+  }
+
+  function positionBtn() {
+    if (collapsed) {
+      btn.style.top = "0";
+    } else {
+      const rect = hudTop.getBoundingClientRect();
+      btn.style.top = rect.bottom + "px";
+    }
+  }
+
+  // Initial state
+  apply(false);
+
+  btn.addEventListener("click", () => {
+    collapsed = !collapsed;
+    localStorage.setItem(STORAGE_KEY_HDR, collapsed ? "1" : "0");
+    apply(true);
+    if (typeof sfx !== "undefined") sfx.click();
+  });
+
+  // Reposition after transitions and on resize
+  hudTop.addEventListener("transitionend", positionBtn);
+  window.addEventListener("resize", positionBtn);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // TERMINAL CLI
 // ─────────────────────────────────────────────────────────────────────────────
 function initTerminalCli() {
@@ -3951,7 +4007,7 @@ function initTerminalCli() {
   function toggleCli(show) {
     cliVisible = typeof show === "boolean" ? show : !cliVisible;
     cliWrap.classList.toggle("hidden", !cliVisible);
-    if (cliVisible) { sfx.panelOpen(); cliInput.focus?.({ preventScroll: true }); } else { sfx.panelClose(); }
+    if (cliVisible) { sfx.panelOpen(); cliInput.focus(); } else { sfx.panelClose(); }
   }
 
   // Backtick (`) or Ctrl+/ toggles the terminal
@@ -4485,7 +4541,7 @@ function initDraggablePanels() {
         if (window.innerWidth <= 980) {
           if (panel.id === "panel-layers") openMobileDrawer("layers");
           else if (panel.id === "panel-right") openMobileDrawer("controls");
-          else panel.scrollIntoView({ behavior: "smooth", block: "center" });
+          else panel.scrollIntoView({ behavior: "smooth", block: "start" });
         }
         refreshRestoreStrip();
       });
@@ -5687,7 +5743,7 @@ function registerEvents() {
   window.addEventListener("keydown", event => {
     const target = event.target;
     if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
-    if (event.key === "/")                { event.preventDefault(); elements.searchInput.focus?.({ preventScroll: true }); elements.searchInput.select(); return; }
+    if (event.key === "/")                { event.preventDefault(); elements.searchInput.focus(); elements.searchInput.select(); return; }
     if (event.key.toLowerCase() === "f") { state.declutter = !state.declutter; applyDeclutterMode(); return; }
     if (event.key.toLowerCase() === "d") { state.compact   = !state.compact;   applyDensityMode();   return; }
     if (event.key.toLowerCase() === "r") { refreshLiveFeeds(); return; }
@@ -6022,11 +6078,11 @@ function renderNewsCards(articles) {
       if (event.key === "ArrowDown") {
         event.preventDefault();
         const next = card.nextElementSibling;
-        if (next instanceof HTMLElement) next.focus?.({ preventScroll: true });
+        if (next instanceof HTMLElement) next.focus();
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         const prev = card.previousElementSibling;
-        if (prev instanceof HTMLElement) prev.focus?.({ preventScroll: true });
+        if (prev instanceof HTMLElement) prev.focus();
       } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         card.click();
@@ -6602,7 +6658,7 @@ function startAmbientUpdates() {
     updateSignalIndicators();
   }, 2000);
   // Slower threat update every 8s
-  threatUpdateTimer = setInterval(updateThreatLevelEnhanced, 8000);
+  // threatUpdateTimer = setInterval(updateThreatLevelEnhanced, 8000); // disabled — threat bar removed
   startEventVisualLifecycle();
   // Initial run
   updateThroughput();
@@ -8156,7 +8212,7 @@ function checkEntityProximity() {
     }
   }
 }
-setInterval(checkEntityProximity, 15000);
+// setInterval(checkEntityProximity, 15000); // disabled — proximity alerts removed
 
 // ─────────────────────────────────────────────────────────────────────────────
 // RADAR BLIP — spawn a blip on the mini radar when events arrive

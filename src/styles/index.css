@@ -3256,17 +3256,6 @@ body.compact-ui .control-group + .control-group {
     display: none;
   }
 
-  /* Prevent background scrolling when mobile drawers or intel sheet are open */
-  body.mobile-drawer-open,
-  body.intel-sheet-open {
-    overflow: hidden;
-  }
-
-  /* Avoid restored panels being hidden under the fixed header on small screens */
-  .draggable-panel {
-    scroll-margin-top: calc(84px + env(safe-area-inset-top, 0px));
-  }
-
   #panel-layers,
   #panel-right,
   .intel-sheet {
@@ -7367,4 +7356,678 @@ body.surgical-zoom .center-reticle { opacity: 0.8; }
   letter-spacing: 0.06em;
   padding: 5px 14px;
   border-bottom: 1px solid rgba(126, 224, 255, 0.08);
+}   MOBILE IMPROVEMENTS v2 — cleaner, less cluttered phone experience
+   Targets: ≤ 980px (tablet/phone), ≤ 680px (phone), ≤ 480px (small phone)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Threat bar removed globally ── */
+.threat-level-bar { display: none !important; }
+
+/* ── Decorative chrome: hide on narrow viewports ── */
+@media (max-width: 980px) {
+  .console-frame,
+  .cinematic-vignette,
+  .chromatic-layer,
+  .vignette-overlay,
+  .console-side,
+  .console-corner,
+  .console-rail,
+  .console-center-reticle,
+  .console-bottom-dock,
+  .data-pulse-ring,
+  .ambient-particles,
+  .ambient-scanline {
+    display: none !important;
+  }
+
+  /* Compress classification bar */
+  #classification-bar {
+    font-size: 0.48rem;
+    padding: 2px 10px;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Cleaner HUD top — collapse to essentials */
+  #hud-top {
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  /* Hide lower-priority HUD chips on mobile */
+  #hud-fps,
+  #hud-camera,
+  #camera-position-hud,
+  #hud-zoom-level,
+  .fps-chip,
+  .camera-pos-chip,
+  .zoom-level-chip {
+    display: none !important;
+  }
+
+  /* Hide verbose HUD action buttons — keep only essential ones */
+  #btn-guide,
+  #btn-declutter,
+  #btn-density,
+  #btn-tilt,
+  #btn-spin {
+    display: none;
+  }
+
+  /* Keep home + settings in HUD */
+  #btn-home,
+  #btn-settings {
+    display: inline-flex;
+  }
+
+  /* Search takes full width */
+  .hud-search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* Clock: compact */
+  .hud-clock-block {
+    font-size: 0.6rem;
+    gap: 4px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  #hud-local { display: none; }
+  .hud-divider { display: none; }
+
+  /* Simpler live status footer */
+  #hud-bottom {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+
+  /* Hide complex footer elements */
+  #hud-signal-strength,
+  #data-throughput,
+  #event-sparkline,
+  #hud-link-count,
+  #hud-data-age,
+  #hud-event-count,
+  #hud-news-count,
+  #session-uptime,
+  #live-last-refresh,
+  #live-next-refresh,
+  #live-status-right .radar-mini {
+    display: none;
+  }
+
+  /* Footer left: only show key counts */
+  #live-status-left {
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  /* Compass rose: smaller and repositioned */
+  #compass-rose {
+    bottom: 80px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Globe nav: move slightly */
+  .globe-nav {
+    bottom: 80px;
+    right: 56px;
+  }
+
+  /* Click popup: always on-screen */
+  .click-location-popup {
+    max-width: min(280px, calc(100vw - 20px));
+    font-size: 0.8em;
+  }
+
+  /* Click conflict box */
+  .click-conflict-box {
+    max-width: min(300px, calc(100vw - 20px));
+  }
+}
+
+/* ── Phone (≤ 680px): further cleanup ── */
+@media (max-width: 680px) {
+  /* Single-row header: logo + search only, actions in drawer */
+  #hud-top {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .hud-logo {
+    flex-shrink: 0;
+  }
+
+  .hud-search {
+    flex: 1 1 200px;
+    order: 2;
+  }
+
+  .hud-clock-block {
+    order: 3;
+    margin-left: auto;
+    font-size: 0.58rem;
+  }
+
+  .hud-right {
+    order: 4;
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: flex-end;
+  }
+
+  /* Hide all hud-right chips on phone */
+  .hud-right .hud-chip { display: none; }
+
+  /* Only show home + settings actions */
+  .hud-right .hud-action { display: none; }
+  #btn-home,
+  #btn-settings { display: inline-flex !important; }
+
+  /* Footer: stack cleanly */
+  #live-status-center {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+  }
+
+  #live-status-left,
+  #live-status-right {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  /* Hide footer signal indicators — redundant on phone */
+  .footer-signals,
+  #presence-indicator,
+  #btn-fullscreen,
+  #refresh-now,
+  .radar-mini {
+    display: none !important;
+  }
+
+  /* Ticker headline */
+  .ticker-row {
+    max-width: 100%;
+  }
+
+  #live-news-headline {
+    font-size: 0.62rem;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Mobile drawer: 4 equal buttons */
+  .mobile-drawers {
+    gap: 5px;
+    padding: 0;
+  }
+
+  .mobile-drawers .hud-action {
+    padding: 10px 4px;
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    min-height: 44px;
+    border-radius: 6px;
+  }
+
+  /* Panels: near full-screen on phone */
+  #panel-layers,
+  #panel-right {
+    top: 68px;
+    width: calc(100vw - 20px);
+    max-width: none;
+    left: 10px;
+    right: 10px;
+  }
+
+  #panel-layers  { transform: translateX(calc(-100vw - 20px)); }
+  #panel-right   { transform: translateX(calc(100vw + 20px)); }
+
+  body.mobile-layers-open #panel-layers   { transform: translateX(0); }
+  body.mobile-controls-open #panel-right  { transform: translateX(0); }
+
+  /* Intel sheet: full-width */
+  .intel-sheet {
+    left: 0;
+    right: 0;
+    width: 100vw;
+    border-radius: 16px 16px 0 0;
+  }
+
+  /* Hide scan line on phone */
+  #scan-line { display: none; }
+
+  /* Floating summary: smaller */
+  #floating-summary {
+    padding: 8px 12px;
+    font-size: 0.6rem;
+    width: min(240px, calc(100vw - 20px));
+  }
+
+  /* Map legend: hidden by default on phone (user can open via panel) */
+  #map-legend { display: none !important; }
+}
+
+/* ── Small phones (≤ 420px) ── */
+@media (max-width: 420px) {
+  #classification-bar { display: none; }
+
+  #app {
+    padding-top: 10px;
+  }
+
+  #hud-top {
+    top: 10px;
+  }
+
+  .logo-icon { display: none; }
+
+  .hud-clock-block { display: none; }
+
+  /* 3-column drawer on very small phones */
+  .mobile-drawers {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mobile-drawers .hud-action {
+    font-size: 0.56rem;
+    padding: 9px 2px;
+  }
+}
+
+/* ── Touch device: enlarge all interactive targets ── */
+@media (pointer: coarse) {
+  .hud-action,
+  .panel-btn,
+  .transport-btn,
+  .globe-nav-btn,
+  .panel-minimize-btn,
+  .panel-close-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .mobile-drawers .hud-action {
+    min-height: 48px;
+  }
+
+  /* Larger close buttons in panels */
+  .panel-close-btn,
+  .panel-minimize-btn {
+    padding: 10px;
+  }
+}
+
+
+/* ── FIX: hud-bottom should stay fixed at bottom on ALL viewports ── */
+@media (max-width: 980px) {
+  #hud-bottom {
+    position: fixed !important;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    margin: 0 !important;
+    z-index: 30 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    padding: 8px 12px !important;
+    border-radius: 10px !important;
+    pointer-events: auto;
+  }
+
+  /* Floating summary: hidden on mobile by default, user can open via panel */
+  #floating-summary {
+    display: none !important;
+  }
+
+  /* Map legend: keep hidden */
+  #map-legend {
+    display: none !important;
+  }
+
+  /* App: no scroll needed, all fixed */
+  body {
+    overflow: hidden !important;
+  }
+
+  #app {
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+}
+
+/* ── Header collapse: body.header-collapsed ── */
+#hud-top {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.25s ease;
+}
+
+body.header-collapsed #hud-top {
+  transform: translateY(-120%) !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Toggle arrow button */
+#header-toggle-btn {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: rgba(10, 14, 26, 0.82);
+  border: 1px solid rgba(126, 224, 255, 0.22);
+  color: rgba(126, 224, 255, 0.8);
+  border-radius: 0 0 20px 20px;
+  padding: 0 18px 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+#header-toggle-btn:hover {
+  border-color: rgba(126, 224, 255, 0.5);
+  color: #7ee0ff;
+  background: rgba(10, 14, 26, 0.92);
+}
+
+#header-toggle-btn .toggle-chevron {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+body.header-collapsed #header-toggle-btn {
+  top: 0;
+  border-radius: 0 0 20px 20px;
+  padding-top: 6px;
+}
+
+body.header-collapsed #header-toggle-btn .toggle-chevron {
+  transform: rotate(180deg);
+}
+
+/* On desktop, position toggle just below the header */
+@media (min-width: 981px) {
+  #header-toggle-btn {
+    top: auto;
+    /* dynamically positioned via JS */
+  }
+}
+
+
+/* ── Header collapsed: reclaim space ── */
+@media (min-width: 981px) {
+  body.header-collapsed #app {
+    padding-top: 18px;
+  }
+}
+
+@media (max-width: 980px) {
+  body.header-collapsed #app {
+    padding-top: 0;
+  }
+  /* When header is collapsed, toggle button anchors to top edge */
+  body.header-collapsed #header-toggle-btn {
+    top: 0 !important;
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+  }
+}
+
+
+/* ── MOBILE HUD-BOTTOM: clean minimal strip ── */
+@media (max-width: 980px) {
+  #hud-bottom {
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    padding: 6px 10px !important;
+    /* Keep only two rows: stats + ticker */
+  }
+
+  /* Hide the right column entirely — too crowded */
+  #live-status-right {
+    display: none !important;
+  }
+
+  /* Strip down left column to just key chips */
+  #live-status-left .hud-chip:not(.hud-live):not(#hud-track-count):not(#hud-alert-count) {
+    display: none !important;
+  }
+
+  /* Center column: only show region label + ticker */
+  #live-status-center {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+  }
+  #live-region-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+  #live-utc-clock,
+  #session-uptime,
+  #live-last-refresh,
+  #live-next-refresh {
+    display: none !important;
+  }
+
+  /* Ticker row: full width, clean */
+  .ticker-row {
+    width: 100%;
+  }
+  #live-news-headline {
+    font-size: 0.6rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* Force hide any remaining footer clutter */
+  #btn-fullscreen,
+  #presence-indicator,
+  .radar-mini,
+  .footer-signals,
+  #refresh-now,
+  #hud-signal-strength,
+  #data-throughput,
+  #event-sparkline,
+  #hud-link-count,
+  #hud-data-age,
+  #hud-event-count,
+  #hud-news-count,
+  #session-uptime,
+  #ticker-lang-btn {
+    display: none !important;
+  }
+
+  /* Left stats row: tight */
+  #live-status-left {
+    display: flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .hud-live {
+    flex-shrink: 0;
+  }
+  #hud-track-count,
+  #hud-alert-count {
+    flex-shrink: 0;
+    font-size: 0.6rem !important;
+  }
+
+  /* Mobile drawers: higher z-index, clear separation */
+  .mobile-drawers {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 45 !important;
+  }
+}
+
+/* ── Very small phones ── */
+@media (max-width: 480px) {
+  #hud-bottom {
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 5px 8px !important;
+  }
+  #live-region-label {
+    display: none !important;
+  }
+}
+
+
+/* ═══ MOBILE BOTTOM v3 — explicit overrides ═══ */
+@media (max-width: 980px) {
+
+  /* hud-bottom: fixed, above drawers, clear visual separation */
+  #hud-bottom {
+    position: fixed !important;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    margin: 0 !important;
+    z-index: 30 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    padding: 8px 12px 8px !important;
+    border-radius: 10px !important;
+    background: rgba(6, 12, 24, 0.88) !important;
+    border: 1px solid rgba(126, 224, 255, 0.15) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+
+  /* Row 1: live status left — show only key chips */
+  #live-status-left {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+  }
+
+  /* Hide everything in left row EXCEPT the 3 key items */
+  #hud-event-count,
+  #hud-news-count,
+  #hud-link-count,
+  #hud-data-age,
+  #hud-signal-strength,
+  #data-throughput,
+  #event-sparkline {
+    display: none !important;
+  }
+
+  /* Ensure the key 3 are visible */
+  #hud-bottom .hud-live,
+  #hud-track-count,
+  #hud-alert-count {
+    display: inline-flex !important;
+    font-size: 0.6rem !important;
+    padding: 3px 8px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Row 2: center — only ticker, no clocks */
+  #live-status-center {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #live-region-label,
+  #live-utc-clock,
+  #session-uptime,
+  #live-last-refresh,
+  #live-next-refresh {
+    display: none !important;
+  }
+
+  .ticker-row {
+    display: flex !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #live-news-headline {
+    display: block !important;
+    font-size: 0.6rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+
+  /* Right column: completely hidden */
+  #live-status-right {
+    display: none !important;
+  }
+
+  /* Drawers: clear separation below hud-bottom */
+  .mobile-drawers {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    z-index: 45 !important;
+    left: 10px !important;
+    right: 10px !important;
+  }
+
+  /* Location HUD: reposition so it doesn't overlap bottom bar */
+  .location-hud {
+    bottom: calc(160px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Camera info chip in HUD: hide on mobile */
+  #hud-camera,
+  #camera-position-hud,
+  #hud-zoom-level,
+  #hud-fps {
+    display: none !important;
+  }
+}
+
+
+/* ═══ MOBILE BOTTOM v4 — fix overlap: push hud-bottom above drawers ═══ */
+@media (max-width: 980px) {
+  #hud-bottom {
+    bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .mobile-drawers {
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 }

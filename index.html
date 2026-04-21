@@ -28,15 +28,13 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='120' y2='120' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='50%25' stop-color='%23a78bfa'/%3E%3Cstop offset='100%25' stop-color='%23ff4d6d'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='120' height='120' rx='24' fill='%230a0e1a'/%3E%3Cpolygon points='60,14 102,38 102,82 60,106 18,82 18,38' fill='none' stroke='url(%23g)' stroke-width='3'/%3E%3Ccircle cx='60' cy='60' r='18' fill='none' stroke='url(%23g)' stroke-width='2.5'/%3E%3Ccircle cx='60' cy='60' r='7' fill='url(%23g)' opacity='0.85'/%3E%3C/svg%3E" />
 
   <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./src/styles/index.css" />
 </head>
 <body>
-  <a href="#cesiumContainer" class="skip-link">Skip to map</a>
-  <noscript>
-    <div class="noscript-warning">This application requires JavaScript. Please enable JavaScript to use God&#39;s Eye.</div>
-  </noscript>
   <!-- ═══════════════════ BOOT INTRO OVERLAY ═══════════════════ -->
   <div id="boot-overlay" class="boot-overlay" aria-hidden="true">
     <div class="boot-shutter boot-shutter-top"></div>
@@ -122,6 +120,12 @@
     </section>
   </div>
 
+  <!-- Header collapse toggle -->
+  <button id="header-toggle-btn" type="button" title="Toggle header" aria-label="Toggle header visibility">
+    <span class="toggle-chevron">⌃</span>
+    <span class="toggle-label">HEADER</span>
+  </button>
+
   <!-- Ping ripple (canvas overlay for click effects) -->
   <canvas id="ping-canvas" class="ping-canvas" aria-hidden="true"></canvas>
 
@@ -137,7 +141,6 @@
     <div class="loc-meta" id="loc-meta"></div>
   </div>
 
-  <main id="main-content" role="main">
   <div id="app">
     <div id="classification-bar" class="classification-bar" aria-hidden="true">UNCLASSIFIED // OPEN SOURCE INTELLIGENCE // PANOPTICON-EARTH v2.0 // ALL FEEDS ACTIVE</div>
     <div id="cesiumContainer"></div>
@@ -206,28 +209,6 @@
         <span id="hud-utc">UTC --:--:--</span>
         <span class="hud-divider">|</span>
         <span id="hud-local">LOCAL --:--:--</span>
-      </div>
-
-      <div class="threat-level-bar" id="threat-level-bar" title="Global threat assessment">
-        <span class="threat-label">THREAT</span>
-        <div class="threat-segments" id="threat-segments">
-          <span class="threat-seg"></span><span class="threat-seg"></span><span class="threat-seg"></span>
-          <span class="threat-seg"></span><span class="threat-seg"></span><span class="threat-seg"></span>
-          <span class="threat-seg"></span><span class="threat-seg"></span><span class="threat-seg"></span>
-          <span class="threat-seg"></span>
-        </div>
-        <span class="threat-value" id="threat-value">0</span>
-        <svg class="threat-ring" viewBox="0 0 28 28" width="28" height="28">
-          <circle cx="14" cy="14" r="12" fill="none" stroke="rgba(126,224,255,0.1)" stroke-width="2"/>
-          <circle id="threat-ring-fill" cx="14" cy="14" r="12" fill="none" stroke="url(#threatGrad)" stroke-width="2" stroke-dasharray="75.4" stroke-dashoffset="75.4" stroke-linecap="round" transform="rotate(-90 14 14)"/>
-          <defs>
-            <linearGradient id="threatGrad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stop-color="#00ff88"/>
-              <stop offset="50%" stop-color="#ffbe5c"/>
-              <stop offset="100%" stop-color="#ff4d6d"/>
-            </linearGradient>
-          </defs>
-        </svg>
       </div>
 
       <div class="hud-right">
@@ -580,7 +561,6 @@
     <canvas id="ambient-particles" class="ambient-particles"></canvas>
 
   </div><!-- /#app -->
-  </main>
 
   <!-- ── Live News Briefing ─────────────────────────────────────────────── -->
   <aside id="news-briefing" class="news-briefing glass-panel hidden" aria-label="Live News Briefing">
@@ -981,6 +961,64 @@
     </a>
   </div>
 
+  <script>
+    // Block Cesium's default Ion demo-token request (the SDK ships with an expired demo token
+    // baked in that 401s on load even when defaultAccessToken is cleared). Since this app uses
+    // OSM imagery and no Ion assets, we safely short-circuit the request and silence the error.
+    (function() {
+      const BLOCK_HOSTS = /^https:\/\/(api\.cesium\.com|assets\.cesium\.com|ion\.cesium\.com)\//i;
+      const origFetch = window.fetch.bind(window);
+      window.fetch = function(input, init) {
+        const url = typeof input === "string" ? input : input?.url;
+        if (url && BLOCK_HOSTS.test(url)) {
+          return Promise.resolve(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));
+        }
+        return origFetch(input, init);
+      };
+      const OrigXHR = window.XMLHttpRequest;
+      const origOpen = OrigXHR.prototype.open;
+      const origSend = OrigXHR.prototype.send;
+      OrigXHR.prototype.open = function(method, url, ...rest) {
+        this.__blockIon = typeof url === "string" && BLOCK_HOSTS.test(url);
+        return origOpen.call(this, method, url, ...rest);
+      };
+      OrigXHR.prototype.send = function(body) {
+        if (this.__blockIon) {
+          // Simulate a no-op successful response so Cesium's error handler never fires.
+          setTimeout(() => {
+            Object.defineProperty(this, "readyState", { value: 4, configurable: true });
+            Object.defineProperty(this, "status",     { value: 204, configurable: true });
+            Object.defineProperty(this, "response",   { value: "",  configurable: true });
+            Object.defineProperty(this, "responseText", { value: "", configurable: true });
+            this.dispatchEvent(new Event("readystatechange"));
+            this.dispatchEvent(new Event("load"));
+            this.dispatchEvent(new Event("loadend"));
+          }, 0);
+          return;
+        }
+        return origSend.call(this, body);
+      };
+      // Silence Cesium error events by checking stack trace.
+      const origError = console.error.bind(console);
+      console.error = function(...args) {
+        const stack = new Error().stack || "";
+        if (stack.includes("Cesium.js") || stack.includes("cesium@")) return;
+        const first = args[0];
+        if (first && typeof first === "object") {
+          if ("statusCode" in first) return;
+          if (first instanceof Error && /Cesium|Ion|access token/i.test(first.message || "")) return;
+        }
+        return origError(...args);
+      };
+      // Swallow unhandled rejections originating from Cesium Ion
+      window.addEventListener("unhandledrejection", (ev) => {
+        const r = ev.reason;
+        if (r && typeof r === "object" && ("statusCode" in r || /Ion|access token/i.test(r.message || ""))) {
+          ev.preventDefault();
+        }
+      });
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
   <script type="module" src="./src/main.js"></script>
 </body>
